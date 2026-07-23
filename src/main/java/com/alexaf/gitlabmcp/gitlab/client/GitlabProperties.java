@@ -1,6 +1,7 @@
 package com.alexaf.gitlabmcp.gitlab.client;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 import java.time.Duration;
 import java.util.List;
@@ -25,6 +26,10 @@ public record GitlabProperties(
         int retryAttempts,
         Duration retryBackoff
 ) {
+
+    @ConstructorBinding
+    public GitlabProperties {
+    }
 
     public GitlabProperties(
             String url,

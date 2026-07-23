@@ -15,6 +15,7 @@ import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
 import com.alexaf.gitlabmcp.port.PipelineContextCollector;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
@@ -35,6 +36,7 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
     private final int maxPipelines;
     private final int maxPipelineDepth;
 
+    @Autowired
     public DefaultPipelineContextCollector(GitlabGateway gitlab, GitlabProperties properties) {
         this(gitlab, properties.maxJobs(), properties.maxPipelines(), properties.maxPipelineDepth());
     }
