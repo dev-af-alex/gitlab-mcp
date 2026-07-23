@@ -135,6 +135,41 @@ class RestGitlabGatewayTest {
     }
 
     @Test
+    void readsLanguageIndependentTestReportOnGitlab15_1() {
+        server.expect(once(), requestTo(
+                        "https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/test_report"))
+                .andRespond(withSuccess("""
+                        {
+                          "total_count": 2,
+                          "failed_count": 1,
+                          "test_suites": [{
+                            "name": "pytest",
+                            "total_count": 2,
+                            "failed_count": 1,
+                            "test_cases": [{
+                              "status": "failed",
+                              "name": "test_checkout",
+                              "classname": "tests.test_checkout",
+                              "stack_trace": "AssertionError"
+                            }]
+                          }]
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        var report = gateway.getPipelineTestReport("group/repo", "42");
+
+        assertThat(report).isPresent().get()
+                .satisfies(value -> {
+                    assertThat(value.totalCount()).isEqualTo(2);
+                    assertThat(value.testSuites()).singleElement()
+                            .satisfies(suite -> assertThat(suite.testCases()).singleElement()
+                                    .satisfies(test -> assertThat(test.name())
+                                            .isEqualTo("test_checkout")));
+                });
+        server.verify();
+    }
+
+    @Test
     void listsArtifactsFromZipOnGitlab15_1() throws Exception {
         expectVersion("15.1.0-ee");
         server.expect(once(), requestTo(

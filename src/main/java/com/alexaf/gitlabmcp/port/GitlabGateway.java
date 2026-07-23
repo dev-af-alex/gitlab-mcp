@@ -9,12 +9,14 @@ import com.alexaf.gitlabmcp.gitlab.dto.Commit;
 import com.alexaf.gitlabmcp.gitlab.dto.CurrentUser;
 import com.alexaf.gitlabmcp.gitlab.dto.Discussion;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
+import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface GitlabGateway {
 
@@ -65,6 +67,8 @@ public interface GitlabGateway {
             Boolean includeRetried,
             int maxJobs
     );
+
+    Optional<GitlabTestReport> getPipelineTestReport(String projectId, String pipelineId);
 
     Job getJob(String projectId, String jobId);
 

@@ -60,7 +60,7 @@ class PipelineDiagnosticsServiceTest {
         PipelineDiagnosticsResult result = service.analyze("group/repo", "pipeline-url", null, true, 4096, true, true);
 
         assertThat(gitlab.projectIdInput).isEqualTo("group/repo");
-        assertThat(gitlab.pipelineIdInput).isEqualTo("pipeline-url");
+        assertThat(gitlab.pipelineIdInputs).containsExactly("pipeline-url", "pipeline-url", "123");
         assertThat(result.pipeline().id()).isEqualTo(123L);
         assertThat(result.summary()).contains("Pipeline 123 failed in 1 job(s)");
         assertThat(result.failedJobs()).hasSize(1);
@@ -229,7 +229,7 @@ class PipelineDiagnosticsServiceTest {
         private final List<String> tailCalls = new ArrayList<>();
         private String projectIdInput;
         private long pipelineIdReturn = 1L;
-        private String pipelineIdInput;
+        private final List<String> pipelineIdInputs = new ArrayList<>();
         private long mergeRequestIidReturn = 1L;
         private String mergeRequestIidInput;
 
@@ -246,7 +246,7 @@ class PipelineDiagnosticsServiceTest {
 
         @Override
         public long pipelineId(String value) {
-            pipelineIdInput = value;
+            pipelineIdInputs.add(value);
             return value.matches("\\d+") ? Long.parseLong(value) : pipelineIdReturn;
         }
 

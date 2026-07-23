@@ -39,9 +39,13 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
                 jobsPipelineId,
                 false,
                 maxJobs);
+        var testReport = gitlab.getPipelineTestReport(
+                projectId,
+                String.valueOf(pipeline.id()));
         return new PipelineContext(
                 pipeline,
                 jobs.items(),
+                testReport.orElse(null),
                 jobs.truncated(),
                 jobs.totalFetched());
     }

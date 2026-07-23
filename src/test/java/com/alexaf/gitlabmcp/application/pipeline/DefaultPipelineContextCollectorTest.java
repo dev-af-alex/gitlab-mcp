@@ -3,11 +3,13 @@ package com.alexaf.gitlabmcp.application.pipeline;
 import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
+import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.mock;
@@ -27,6 +29,10 @@ class DefaultPipelineContextCollectorTest {
         when(gitlab.getPipeline("group/repo", "pipeline-url")).thenReturn(pipeline);
         when(gitlab.getPipelineJobs("group/repo", "pipeline-url", false, 2))
                 .thenReturn(new GitlabPage<>(jobs, "https://gitlab.example/next", 2, true));
+        GitlabTestReport testReport = new GitlabTestReport(
+                1.0, 2, 1, 1, 0, 0, List.of());
+        when(gitlab.getPipelineTestReport("group/repo", "42"))
+                .thenReturn(Optional.of(testReport));
 
         var context = collector.collect("group/repo", "pipeline-url", null);
 
@@ -34,6 +40,7 @@ class DefaultPipelineContextCollectorTest {
         assertThat(context.jobs()).containsExactlyElementsOf(jobs);
         assertThat(context.jobsTruncated()).isTrue();
         assertThat(context.totalJobsFetched()).isEqualTo(2);
+        assertThat(context.testReport()).isSameAs(testReport);
         verify(gitlab).getPipelineJobs("group/repo", "pipeline-url", false, 2);
     }
 

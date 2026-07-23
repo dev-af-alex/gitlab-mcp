@@ -10,6 +10,8 @@ import com.alexaf.gitlabmcp.gitlab.dto.Commit;
 import com.alexaf.gitlabmcp.gitlab.dto.CurrentUser;
 import com.alexaf.gitlabmcp.gitlab.dto.Discussion;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
+import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
@@ -19,6 +21,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 @Component
 public class RestGitlabGateway implements GitlabGateway {
@@ -167,6 +170,21 @@ public class RestGitlabGateway implements GitlabGateway {
                 gitlab.param("include_retried", includeRetried),
                 gitlab.param("page", 1),
                 gitlab.param("per_page", 100));
+    }
+
+    @Override
+    public Optional<GitlabTestReport> getPipelineTestReport(
+            String projectId,
+            String pipelineId
+    ) {
+        long id = gitlab.pipelineId(pipelineId);
+        try {
+            return Optional.ofNullable(gitlab.getObject(
+                    projectApi(projectId) + "/pipelines/" + id + "/test_report",
+                    GitlabTestReport.class));
+        } catch (GitlabNotFoundException reportUnavailable) {
+            return Optional.empty();
+        }
     }
 
     @Override
