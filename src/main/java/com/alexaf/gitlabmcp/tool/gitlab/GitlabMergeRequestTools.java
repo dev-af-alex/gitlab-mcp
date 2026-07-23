@@ -1,11 +1,9 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
-import com.alexaf.gitlabmcp.gitlab.dto.Commit;
-import com.alexaf.gitlabmcp.gitlab.dto.Discussion;
-import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
-import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
-import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
 import org.springframework.ai.mcp.annotation.McpToolParam;
@@ -14,10 +12,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class GitlabMergeRequestTools {
 
-    private final GitlabApiClient gitlab;
+    private final GitlabGateway gitlab;
+    private final JsonResponseWriter responseWriter;
 
-    public GitlabMergeRequestTools(GitlabApiClient gitlab) {
+    public GitlabMergeRequestTools(GitlabGateway gitlab, JsonResponseWriter responseWriter) {
         this.gitlab = gitlab;
+        this.responseWriter = responseWriter;
     }
 
     @McpTool(
@@ -43,18 +43,15 @@ public class GitlabMergeRequestTools {
             Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
             Integer perPage) {
-        String projectPath = gitlab.projectPath(projectId);
-        return gitlab.json(gitlab.getList("/projects/" + projectPath + "/merge_requests", MergeRequest.class,
-                gitlab.param("state", gitlab.mergeRequestState(state)),
-                gitlab.param("search", search),
-                gitlab.param("source_branch", sourceBranch),
-                gitlab.param("target_branch", targetBranch),
-                gitlab.param("author_username", authorUsername),
-                gitlab.param("reviewer_username", reviewerUsername),
-                gitlab.param("order_by", "updated_at"),
-                gitlab.param("sort", "desc"),
-                gitlab.param("page", gitlab.page(page)),
-                gitlab.param("per_page", gitlab.perPage(perPage))));
+        MergeRequestQuery query = new MergeRequestQuery(
+                state,
+                search,
+                sourceBranch,
+                targetBranch,
+                authorUsername,
+                reviewerUsername,
+                new GitlabPageRequest(page, perPage));
+        return responseWriter.write(gitlab.listMergeRequests(projectId, query));
     }
 
     @McpTool(
@@ -66,9 +63,7 @@ public class GitlabMergeRequestTools {
             String projectId,
             @McpToolParam(description = "Merge request IID, for example 2115, !2115, or a GitLab merge request URL.")
             String mergeRequestIid) {
-        long iid = gitlab.mergeRequestIid(mergeRequestIid);
-        return gitlab.json(gitlab.getObject("/projects/" + gitlab.projectPath(projectId) + "/merge_requests/" + iid,
-                MergeRequest.class));
+        return responseWriter.write(gitlab.getMergeRequest(projectId, mergeRequestIid));
     }
 
     @McpTool(
@@ -80,9 +75,7 @@ public class GitlabMergeRequestTools {
             String projectId,
             @McpToolParam(description = "Merge request IID, for example 2115, !2115, or a GitLab merge request URL.")
             String mergeRequestIid) {
-        long iid = gitlab.mergeRequestIid(mergeRequestIid);
-        return gitlab.json(gitlab.getObject("/projects/" + gitlab.projectPath(projectId) + "/merge_requests/" + iid + "/changes",
-                MergeRequestChanges.class));
+        return responseWriter.write(gitlab.getMergeRequestChanges(projectId, mergeRequestIid));
     }
 
     @McpTool(
@@ -98,11 +91,10 @@ public class GitlabMergeRequestTools {
             Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
             Integer perPage) {
-        long iid = gitlab.mergeRequestIid(mergeRequestIid);
-        return gitlab.json(gitlab.getList("/projects/" + gitlab.projectPath(projectId) + "/merge_requests/" + iid + "/commits",
-                Commit.class,
-                gitlab.param("page", gitlab.page(page)),
-                gitlab.param("per_page", gitlab.perPage(perPage))));
+        return responseWriter.write(gitlab.listMergeRequestCommits(
+                projectId,
+                mergeRequestIid,
+                new GitlabPageRequest(page, perPage)));
     }
 
     @McpTool(
@@ -118,11 +110,10 @@ public class GitlabMergeRequestTools {
             Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
             Integer perPage) {
-        long iid = gitlab.mergeRequestIid(mergeRequestIid);
-        return gitlab.json(gitlab.getList("/projects/" + gitlab.projectPath(projectId) + "/merge_requests/" + iid + "/discussions",
-                Discussion.class,
-                gitlab.param("page", gitlab.page(page)),
-                gitlab.param("per_page", gitlab.perPage(perPage))));
+        return responseWriter.write(gitlab.listMergeRequestDiscussions(
+                projectId,
+                mergeRequestIid,
+                new GitlabPageRequest(page, perPage)));
     }
 
     @McpTool(
@@ -138,10 +129,9 @@ public class GitlabMergeRequestTools {
             Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
             Integer perPage) {
-        long iid = gitlab.mergeRequestIid(mergeRequestIid);
-        return gitlab.json(gitlab.getList("/projects/" + gitlab.projectPath(projectId) + "/merge_requests/" + iid + "/pipelines",
-                Pipeline.class,
-                gitlab.param("page", gitlab.page(page)),
-                gitlab.param("per_page", gitlab.perPage(perPage))));
+        return responseWriter.write(gitlab.listMergeRequestPipelines(
+                projectId,
+                mergeRequestIid,
+                new GitlabPageRequest(page, perPage)));
     }
 }

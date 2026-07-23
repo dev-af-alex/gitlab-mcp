@@ -1,5 +1,8 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.ArtifactHintDetector;
@@ -18,6 +21,7 @@ import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -26,10 +30,16 @@ import org.springframework.web.client.RestClient;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 class GitlabToolComponentsTest {
 
     private RecordingGitlabApiClient gitlab;
+    private GitlabGateway gateway;
+    private JsonResponseWriter responseWriter;
     private RecordingPipelineDiagnosticsService diagnosticsService;
     private GitlabProjectTools projectTools;
     private GitlabMergeRequestTools mergeRequestTools;
@@ -61,9 +71,12 @@ class GitlabToolComponentsTest {
     @BeforeEach
     void setUp() {
         gitlab = new RecordingGitlabApiClient();
+        gateway = mock(GitlabGateway.class);
+        responseWriter = mock(JsonResponseWriter.class);
+        when(responseWriter.write(any())).thenReturn("json");
         diagnosticsService = new RecordingPipelineDiagnosticsService(gitlab);
-        projectTools = new GitlabProjectTools(gitlab);
-        mergeRequestTools = new GitlabMergeRequestTools(gitlab);
+        projectTools = new GitlabProjectTools(gateway, responseWriter);
+        mergeRequestTools = new GitlabMergeRequestTools(gateway, responseWriter);
         pipelineTools = new GitlabPipelineTools(gitlab);
         jobTools = new GitlabJobTools(gitlab);
         diagnosticsTools = new GitlabDiagnosticsTools(gitlab, diagnosticsService);
@@ -72,157 +85,120 @@ class GitlabToolComponentsTest {
     @Test
     void getCurrentUserCallsUserEndpointAndSerializesResponse() {
         CurrentUser user = new CurrentUser(7L, "alice", "Alice", "active", null, null, null, null, null);
-        gitlab.objectResponse = user;
+        when(gateway.getCurrentUser()).thenReturn(user);
 
         String response = projectTools.getCurrentUser();
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/user", CurrentUser.class, List.of()));
-        assertThat(gitlab.jsonInput).isSameAs(user);
+        verify(gateway).getCurrentUser();
+        verify(responseWriter).write(user);
     }
 
     @Test
     void searchProjectsMapsPaginationAndSearchToProjectsEndpoint() {
         List<Project> projects = List.of(project(11L, "demo"));
-        gitlab.listResponse = projects;
+        when(gateway.searchProjects("demo", new GitlabPageRequest(2, 50))).thenReturn(projects);
 
         String response = projectTools.searchProjects("demo", 2, 50);
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects", Project.class, List.of(
-                new GitlabApiClient.QueryParam("search", "demo"),
-                new GitlabApiClient.QueryParam("membership", true),
-                new GitlabApiClient.QueryParam("page", 2),
-                new GitlabApiClient.QueryParam("per_page", 50)
-        )));
-        assertThat(gitlab.jsonInput).isSameAs(projects);
+        verify(gateway).searchProjects("demo", new GitlabPageRequest(2, 50));
+        verify(responseWriter).write(projects);
     }
 
     @Test
     void getProjectEncodesProjectIdBeforeCallingProjectEndpoint() {
         Project project = project(11L, "repo");
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.objectResponse = project;
+        when(gateway.getProject("group/repo")).thenReturn(project);
 
         String response = projectTools.getProject("group/repo");
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.projectIdInput).isEqualTo("group/repo");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo", Project.class, List.of()));
-        assertThat(gitlab.jsonInput).isSameAs(project);
+        verify(gateway).getProject("group/repo");
+        verify(responseWriter).write(project);
     }
 
     @Test
     void listMergeRequestsMapsFiltersSortingAndPagination() {
         List<MergeRequest> mergeRequests = List.of();
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.listResponse = mergeRequests;
+        MergeRequestQuery query = new MergeRequestQuery(
+                "open", "bug", "feature", "main", "alice", "bob",
+                new GitlabPageRequest(3, 25));
+        when(gateway.listMergeRequests("group/repo", query)).thenReturn(mergeRequests);
 
         String response = mergeRequestTools.listMergeRequests(
                 "group/repo", "open", "bug", "feature", "main", "alice", "bob", 3, 25);
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.projectIdInput).isEqualTo("group/repo");
-        assertThat(gitlab.stateInput).isEqualTo("open");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo/merge_requests", MergeRequest.class, List.of(
-                new GitlabApiClient.QueryParam("state", "opened"),
-                new GitlabApiClient.QueryParam("search", "bug"),
-                new GitlabApiClient.QueryParam("source_branch", "feature"),
-                new GitlabApiClient.QueryParam("target_branch", "main"),
-                new GitlabApiClient.QueryParam("author_username", "alice"),
-                new GitlabApiClient.QueryParam("reviewer_username", "bob"),
-                new GitlabApiClient.QueryParam("order_by", "updated_at"),
-                new GitlabApiClient.QueryParam("sort", "desc"),
-                new GitlabApiClient.QueryParam("page", 3),
-                new GitlabApiClient.QueryParam("per_page", 25)
-        )));
-        assertThat(gitlab.jsonInput).isSameAs(mergeRequests);
+        verify(gateway).listMergeRequests("group/repo", query);
+        verify(responseWriter).write(mergeRequests);
     }
 
     @Test
     void getMergeRequestMapsProjectAndIidToEndpoint() {
         MergeRequest mergeRequest = mergeRequest(42L);
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.mergeRequestIidReturn = 42L;
-        gitlab.objectResponse = mergeRequest;
+        when(gateway.getMergeRequest("group/repo", "!42")).thenReturn(mergeRequest);
 
         String response = mergeRequestTools.getMergeRequest("group/repo", "!42");
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.projectIdInput).isEqualTo("group/repo");
-        assertThat(gitlab.mergeRequestIidInput).isEqualTo("!42");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo/merge_requests/42", MergeRequest.class, List.of()));
-        assertThat(gitlab.jsonInput).isSameAs(mergeRequest);
+        verify(gateway).getMergeRequest("group/repo", "!42");
+        verify(responseWriter).write(mergeRequest);
     }
 
     @Test
     void getMergeRequestChangesMapsProjectAndIidToChangesEndpoint() {
         MergeRequestChanges changes = new MergeRequestChanges(1L, 42L, 11L, "MR", null, "opened",
                 "main", "feature", null, null, List.of());
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.mergeRequestIidReturn = 42L;
-        gitlab.objectResponse = changes;
+        when(gateway.getMergeRequestChanges("group/repo", "!42")).thenReturn(changes);
 
         String response = mergeRequestTools.getMergeRequestChanges("group/repo", "!42");
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo/merge_requests/42/changes",
-                MergeRequestChanges.class, List.of()));
-        assertThat(gitlab.jsonInput).isSameAs(changes);
+        verify(gateway).getMergeRequestChanges("group/repo", "!42");
+        verify(responseWriter).write(changes);
     }
 
     @Test
     void getMergeRequestCommitsMapsProjectIidAndPagination() {
         List<Commit> commits = List.of();
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.mergeRequestIidReturn = 42L;
-        gitlab.listResponse = commits;
+        when(gateway.listMergeRequestCommits(
+                "group/repo", "!42", new GitlabPageRequest(4, 30))).thenReturn(commits);
 
         String response = mergeRequestTools.getMergeRequestCommits("group/repo", "!42", 4, 30);
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo/merge_requests/42/commits",
-                Commit.class, List.of(
-                new GitlabApiClient.QueryParam("page", 4),
-                new GitlabApiClient.QueryParam("per_page", 30)
-        )));
-        assertThat(gitlab.jsonInput).isSameAs(commits);
+        verify(gateway).listMergeRequestCommits(
+                "group/repo", "!42", new GitlabPageRequest(4, 30));
+        verify(responseWriter).write(commits);
     }
 
     @Test
     void getMergeRequestDiscussionsMapsProjectIidAndPagination() {
         List<Discussion> discussions = List.of();
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.mergeRequestIidReturn = 42L;
-        gitlab.listResponse = discussions;
+        when(gateway.listMergeRequestDiscussions(
+                "group/repo", "!42", new GitlabPageRequest(5, 40))).thenReturn(discussions);
 
         String response = mergeRequestTools.getMergeRequestDiscussions("group/repo", "!42", 5, 40);
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo/merge_requests/42/discussions",
-                Discussion.class, List.of(
-                new GitlabApiClient.QueryParam("page", 5),
-                new GitlabApiClient.QueryParam("per_page", 40)
-        )));
-        assertThat(gitlab.jsonInput).isSameAs(discussions);
+        verify(gateway).listMergeRequestDiscussions(
+                "group/repo", "!42", new GitlabPageRequest(5, 40));
+        verify(responseWriter).write(discussions);
     }
 
     @Test
     void getMergeRequestPipelinesMapsProjectIidAndPagination() {
         List<Pipeline> pipelines = List.of();
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.mergeRequestIidReturn = 42L;
-        gitlab.listResponse = pipelines;
+        when(gateway.listMergeRequestPipelines(
+                "group/repo", "!42", new GitlabPageRequest(6, 60))).thenReturn(pipelines);
 
         String response = mergeRequestTools.getMergeRequestPipelines("group/repo", "!42", 6, 60);
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo/merge_requests/42/pipelines",
-                Pipeline.class, List.of(
-                new GitlabApiClient.QueryParam("page", 6),
-                new GitlabApiClient.QueryParam("per_page", 60)
-        )));
-        assertThat(gitlab.jsonInput).isSameAs(pipelines);
+        verify(gateway).listMergeRequestPipelines(
+                "group/repo", "!42", new GitlabPageRequest(6, 60));
+        verify(responseWriter).write(pipelines);
     }
 
     @Test

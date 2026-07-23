@@ -1,8 +1,8 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
-import com.alexaf.gitlabmcp.gitlab.dto.CurrentUser;
-import com.alexaf.gitlabmcp.gitlab.dto.Project;
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
 import org.springframework.ai.mcp.annotation.McpToolParam;
@@ -11,10 +11,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class GitlabProjectTools {
 
-    private final GitlabApiClient gitlab;
+    private final GitlabGateway gitlab;
+    private final JsonResponseWriter responseWriter;
 
-    public GitlabProjectTools(GitlabApiClient gitlab) {
+    public GitlabProjectTools(GitlabGateway gitlab, JsonResponseWriter responseWriter) {
         this.gitlab = gitlab;
+        this.responseWriter = responseWriter;
     }
 
     @McpTool(
@@ -22,7 +24,7 @@ public class GitlabProjectTools {
             description = "Get the GitLab user associated with the configured token.",
             annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public String getCurrentUser() {
-        return gitlab.json(gitlab.getObject("/user", CurrentUser.class));
+        return responseWriter.write(gitlab.getCurrentUser());
     }
 
     @McpTool(
@@ -36,11 +38,7 @@ public class GitlabProjectTools {
             Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
             Integer perPage) {
-        return gitlab.json(gitlab.getList("/projects", Project.class,
-                gitlab.param("search", search),
-                gitlab.param("membership", true),
-                gitlab.param("page", gitlab.page(page)),
-                gitlab.param("per_page", gitlab.perPage(perPage))));
+        return responseWriter.write(gitlab.searchProjects(search, new GitlabPageRequest(page, perPage)));
     }
 
     @McpTool(
@@ -50,6 +48,6 @@ public class GitlabProjectTools {
     public String getProject(
             @McpToolParam(description = "Project id or full path, for example group/subgroup/project.")
             String projectId) {
-        return gitlab.json(gitlab.getObject("/projects/" + gitlab.projectPath(projectId), Project.class));
+        return responseWriter.write(gitlab.getProject(projectId));
     }
 }
