@@ -5,7 +5,7 @@ diagnostics. It uses Spring Boot and Spring AI and communicates with MCP clients
 
 ## Requirements
 
-- JDK 25 and Maven 3.9+ for a native build
+- JDK 21 or newer and Maven 3.9+ for a native build
 - Docker for the container image
 - Docker Desktop with MCP Toolkit enabled for Docker MCP profiles
 - A GitLab Personal Access Token with the `read_api` scope

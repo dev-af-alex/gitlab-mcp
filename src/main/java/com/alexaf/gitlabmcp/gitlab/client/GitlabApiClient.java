@@ -548,7 +548,7 @@ public class GitlabApiClient {
             return restClient.get()
                     .uri(uri)
                     .header("PRIVATE-TOKEN", requireToken(properties.token()))
-                    .exchange((_, response) -> {
+                    .exchange((request, response) -> {
                         HttpStatusCode status = response.getStatusCode();
                         if (status.is4xxClientError()) {
                             throw clientException(uri, status);

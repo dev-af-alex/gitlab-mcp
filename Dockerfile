@@ -1,4 +1,4 @@
-FROM maven:3.9-eclipse-temurin-25 AS build
+FROM maven:3.9-eclipse-temurin-21 AS build
 
 WORKDIR /workspace
 COPY pom.xml .
@@ -6,7 +6,7 @@ RUN mvn --batch-mode --no-transfer-progress dependency:go-offline
 COPY src ./src
 RUN mvn --batch-mode --no-transfer-progress -DskipTests package
 
-FROM eclipse-temurin:25-jre
+FROM eclipse-temurin:21-jre
 
 COPY certs/ /tmp/custom-ca-certificates/
 RUN set -eu; \
