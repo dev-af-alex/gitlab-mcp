@@ -93,3 +93,39 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: false
           tags: gitlab-mcp:ci
+
+  build-verification:
+    name: Build verification
+    if: ${{ always() }}
+    needs:
+      - changes
+      - test
+      - docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify build results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          JAVA_RESULT: ${{ needs.test.result }}
+          DOCKER_RESULT: ${{ needs.docker.result }}
+        run: |
+          failed=false
+
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "::error::Build change detection completed with result '$CHANGES_RESULT'."
+            failed=true
+          fi
+
+          if [[ "$JAVA_RESULT" != "success" && "$JAVA_RESULT" != "skipped" ]]; then
+            echo "::error::Java verification completed with result '$JAVA_RESULT'."
+            failed=true
+          fi
+
+          if [[ "$DOCKER_RESULT" != "success" && "$DOCKER_RESULT" != "skipped" ]]; then
+            echo "::error::Docker verification completed with result '$DOCKER_RESULT'."
+            failed=true
+          fi
+
+          if [[ "$failed" == "true" ]]; then
+            exit 1
+          fi
