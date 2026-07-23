@@ -1,7 +1,7 @@
 FROM maven:3.9-eclipse-temurin-21 AS build
 
 WORKDIR /workspace
-COPY pom.xml .
+COPY pom.xml LICENSE NOTICE ./
 RUN mvn --batch-mode --no-transfer-progress dependency:go-offline
 COPY src ./src
 RUN mvn --batch-mode --no-transfer-progress -DskipTests package

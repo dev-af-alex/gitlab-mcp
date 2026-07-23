@@ -279,3 +279,9 @@ For a client configured manually over stdio, use:
   }
 }
 ```
+
+## License
+
+Copyright 2026 Aleksei Afanasev.
+
+Licensed under the [Apache License, Version 2.0](LICENSE). See [NOTICE](NOTICE) for attribution.
