@@ -2,25 +2,68 @@ name: CI
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 permissions:
   contents: read
 
 jobs:
+  changes:
+    name: Detect build changes
+    runs-on: ubuntu-latest
+    outputs:
+      java: ${{ steps.classify.outputs.java }}
+      docker: ${{ steps.classify.outputs.docker }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - name: Test build change detector
+        run: node --test .github/scripts/detect-build-changes.test.mjs
+      - name: Classify changed files
+        id: classify
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          BEFORE_SHA: ${{ github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          PR_BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          if [[ "$EVENT_NAME" == "pull_request" ]]; then
+            range="$PR_BASE_SHA...$PR_HEAD_SHA"
+          elif [[ "$BEFORE_SHA" == "0000000000000000000000000000000000000000" ]]; then
+            git diff-tree --root --no-commit-id --name-only -r -z "$HEAD_SHA" |
+              node .github/scripts/detect-build-changes.mjs |
+              tee -a "$GITHUB_OUTPUT"
+            exit
+          else
+            range="$BEFORE_SHA..$HEAD_SHA"
+          fi
+
+          git diff --name-only -z "$range" |
+            node .github/scripts/detect-build-changes.mjs |
+            tee -a "$GITHUB_OUTPUT"
+
   test:
     name: ${{ matrix.os }} / Java ${{ matrix.java }}
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.java == 'true') }}
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        os:
-          - ubuntu-latest
-          - windows-latest
-          - macos-latest
-        java:
-          - "21"
-          - "25"
+        include:
+          - os: ubuntu-latest
+            java: "21"
+          - os: windows-latest
+            java: "21"
+          - os: macos-latest
+            java: "21"
+          - os: ubuntu-latest
+            java: "25"
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-java@v5
@@ -28,10 +71,17 @@ jobs:
           distribution: temurin
           java-version: ${{ matrix.java }}
           cache: maven
-      - run: mvn --batch-mode --no-transfer-progress verify
+      - name: Verify
+        if: runner.os != 'Windows'
+        run: ./mvnw --batch-mode --no-transfer-progress verify
+      - name: Verify
+        if: runner.os == 'Windows'
+        run: .\mvnw.cmd --batch-mode --no-transfer-progress verify
 
   docker:
     name: Docker linux/amd64 and linux/arm64
+    needs: changes
+    if: ${{ !cancelled() && (needs.changes.result != 'success' || needs.changes.outputs.docker == 'true') }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -43,3 +93,39 @@ jobs:
           platforms: linux/amd64,linux/arm64
           push: false
           tags: gitlab-mcp:ci
+
+  build-verification:
+    name: Build verification
+    if: ${{ always() }}
+    needs:
+      - changes
+      - test
+      - docker
+    runs-on: ubuntu-latest
+    steps:
+      - name: Verify build results
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          JAVA_RESULT: ${{ needs.test.result }}
+          DOCKER_RESULT: ${{ needs.docker.result }}
+        run: |
+          failed=false
+
+          if [[ "$CHANGES_RESULT" != "success" ]]; then
+            echo "::error::Build change detection completed with result '$CHANGES_RESULT'."
+            failed=true
+          fi
+
+          if [[ "$JAVA_RESULT" != "success" && "$JAVA_RESULT" != "skipped" ]]; then
+            echo "::error::Java verification completed with result '$JAVA_RESULT'."
+            failed=true
+          fi
+
+          if [[ "$DOCKER_RESULT" != "success" && "$DOCKER_RESULT" != "skipped" ]]; then
+            echo "::error::Docker verification completed with result '$DOCKER_RESULT'."
+            failed=true
+          fi
+
+          if [[ "$failed" == "true" ]]; then
+            exit 1
+          fi
