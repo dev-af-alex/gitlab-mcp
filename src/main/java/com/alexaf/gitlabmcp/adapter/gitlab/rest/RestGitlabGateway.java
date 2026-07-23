@@ -26,16 +26,19 @@ public class RestGitlabGateway implements GitlabGateway {
     private final GitlabApiClient gitlab;
     private final GitlabServerInfoProvider serverInfoProvider;
     private final MergeRequestDiffProvider mergeRequestDiffProvider;
+    private final ArtifactIndexProvider artifactIndexProvider;
 
     @Autowired
     public RestGitlabGateway(
             GitlabApiClient gitlab,
             GitlabServerInfoProvider serverInfoProvider,
-            MergeRequestDiffProvider mergeRequestDiffProvider
+            MergeRequestDiffProvider mergeRequestDiffProvider,
+            ArtifactIndexProvider artifactIndexProvider
     ) {
         this.gitlab = gitlab;
         this.serverInfoProvider = serverInfoProvider;
         this.mergeRequestDiffProvider = mergeRequestDiffProvider;
+        this.artifactIndexProvider = artifactIndexProvider;
     }
 
     public RestGitlabGateway(GitlabApiClient gitlab) {
@@ -44,6 +47,7 @@ public class RestGitlabGateway implements GitlabGateway {
         this.gitlab = gitlab;
         this.serverInfoProvider = serverInfoProvider;
         this.mergeRequestDiffProvider = new MergeRequestDiffProvider(gitlab, serverInfoProvider);
+        this.artifactIndexProvider = new ArtifactIndexProvider(gitlab, serverInfoProvider);
     }
 
     @Override
@@ -186,8 +190,11 @@ public class RestGitlabGateway implements GitlabGateway {
             GitlabPageRequest page
     ) {
         long id = gitlab.jobId(jobId);
-        return gitlab.listArtifactArchive(projectApi(projectId) + "/jobs/" + id + "/artifacts",
-                path, recursive, pageValue(page), perPageValue(page));
+        return artifactIndexProvider.list(
+                projectApi(projectId) + "/jobs/" + id,
+                path,
+                recursive,
+                page);
     }
 
     @Override
@@ -199,8 +206,11 @@ public class RestGitlabGateway implements GitlabGateway {
             GitlabPageRequest page
     ) {
         long id = gitlab.jobId(jobId);
-        return gitlab.findArtifactArchiveFiles(projectApi(projectId) + "/jobs/" + id + "/artifacts",
-                pattern, regex, pageValue(page), perPageValue(page));
+        return artifactIndexProvider.find(
+                projectApi(projectId) + "/jobs/" + id,
+                pattern,
+                regex,
+                page);
     }
 
     @Override

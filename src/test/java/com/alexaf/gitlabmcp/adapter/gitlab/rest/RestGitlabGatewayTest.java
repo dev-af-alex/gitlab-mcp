@@ -11,7 +11,10 @@ import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
+import java.io.ByteArrayOutputStream;
 import java.util.List;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.ExpectedCount.once;
@@ -132,6 +135,58 @@ class RestGitlabGatewayTest {
     }
 
     @Test
+    void listsArtifactsFromZipOnGitlab15_1() throws Exception {
+        expectVersion("15.1.0-ee");
+        server.expect(once(), requestTo(
+                        "https://gitlab.example/api/v4/projects/group%2Frepo/jobs/7/artifacts"))
+                .andRespond(withSuccess(
+                        zip("target/report.xml"),
+                        MediaType.APPLICATION_OCTET_STREAM));
+
+        var artifacts = gateway.listJobArtifacts(
+                "group/repo",
+                "7",
+                null,
+                true,
+                new GitlabPageRequest(1, 20));
+
+        assertThat(artifacts).singleElement()
+                .satisfies(artifact -> assertThat(artifact.path()).isEqualTo("target/report.xml"));
+        server.verify();
+    }
+
+    @Test
+    void listsArtifactsFromMetadataOnGitlab18_8() {
+        expectVersion("18.8.0-ee");
+        server.expect(once(), requestTo(
+                        "https://gitlab.example/api/v4/projects/group%2Frepo/jobs/7/artifacts/tree"
+                                + "?recursive=true&page=1&per_page=20"))
+                .andRespond(withSuccess("""
+                        [{
+                          "name": "report.xml",
+                          "path": "target/report.xml",
+                          "type": "file",
+                          "size": 42,
+                          "mode": "100644"
+                        }]
+                        """, MediaType.APPLICATION_JSON));
+
+        var artifacts = gateway.listJobArtifacts(
+                "group/repo",
+                "7",
+                null,
+                true,
+                new GitlabPageRequest(1, 20));
+
+        assertThat(artifacts).singleElement()
+                .satisfies(artifact -> {
+                    assertThat(artifact.path()).isEqualTo("target/report.xml");
+                    assertThat(artifact.size()).isEqualTo(42);
+                });
+        server.verify();
+    }
+
+    @Test
     void readsAndCachesGitlabServerInformation() {
         expectVersion("15.1.0-ee");
 
@@ -149,5 +204,17 @@ class RestGitlabGatewayTest {
                 .andRespond(withSuccess("""
                         {"version": "%s", "revision": "abc123"}
                         """.formatted(version), MediaType.APPLICATION_JSON));
+    }
+
+    private byte[] zip(String... entries) throws Exception {
+        ByteArrayOutputStream output = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(output)) {
+            for (String entry : entries) {
+                zip.putNextEntry(new ZipEntry(entry));
+                zip.write(("content for " + entry).getBytes());
+                zip.closeEntry();
+            }
+        }
+        return output.toByteArray();
     }
 }

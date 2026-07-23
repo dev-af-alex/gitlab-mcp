@@ -49,7 +49,7 @@ public class GitlabJobTools {
 
     @McpTool(
             name = "gitlab_list_job_artifacts",
-            description = "List files in a GitLab job artifacts ZIP archive without using /artifacts/tree. Read-only.",
+            description = "List files in GitLab job artifacts, using artifact metadata when the server supports it. Read-only.",
             annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public String listJobArtifacts(
             @McpToolParam(description = "Project id or full path.")
