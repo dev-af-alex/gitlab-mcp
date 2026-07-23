@@ -1,0 +1,11 @@
+{
+  "version": {"version": "18.11.7-ee", "revision": "fixture-18"},
+  "pipeline": {"id": 1811, "project_id": 11, "status": "failed", "source": "pipeline", "inputs": []},
+  "job": {
+    "id": 1801,
+    "name": "gradle",
+    "status": "failed",
+    "runner": {"id": 18, "description": "arm64 runner", "runner_type": "group_type", "online": true}
+  },
+  "test_report": {"total_count": 8, "failed_count": 1, "test_suites": [], "new_statistics": true}
+}

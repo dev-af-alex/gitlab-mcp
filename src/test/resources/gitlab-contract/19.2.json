@@ -1,0 +1,12 @@
+{
+  "version": {"version": "19.2.0-ee", "revision": "fixture-19"},
+  "pipeline": {"id": 1920, "project_id": 11, "status": "failed", "source": "push", "future_object": {"enabled": true}},
+  "job": {
+    "id": 1901,
+    "name": "maven",
+    "status": "failed",
+    "runner": {"id": 19, "description": "current runner", "runner_type": "project_type", "online": true},
+    "new_job_field": "ignored"
+  },
+  "test_report": {"total_count": 13, "failed_count": 1, "test_suites": [], "future_report_field": "ignored"}
+}

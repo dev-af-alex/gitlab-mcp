@@ -1,0 +1,11 @@
+{
+  "version": {"version": "16.11.10-ee", "revision": "fixture-16"},
+  "pipeline": {"id": 1611, "project_id": 11, "status": "failed", "source": "merge_request_event", "name": "verify"},
+  "job": {
+    "id": 1601,
+    "name": "pytest",
+    "status": "failed",
+    "runner": {"id": 16, "description": "linux runner", "runner_type": "project_type", "online": true}
+  },
+  "test_report": {"total_count": 3, "failed_count": 1, "test_suites": []}
+}

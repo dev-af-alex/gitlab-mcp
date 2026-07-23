@@ -1,0 +1,6 @@
+{
+  "version": {"version": "15.1.0-ee", "revision": "fixture-15"},
+  "pipeline": {"id": 151, "project_id": 11, "status": "failed", "source": "push", "future_field": "ignored"},
+  "job": {"id": 1501, "name": "test", "status": "failed", "failure_reason": "script_failure"},
+  "test_report": {"total_count": 2, "failed_count": 1, "test_suites": []}
+}

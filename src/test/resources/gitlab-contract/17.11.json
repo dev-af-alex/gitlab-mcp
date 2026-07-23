@@ -1,0 +1,11 @@
+{
+  "version": {"version": "17.11.7-ee", "revision": "fixture-17"},
+  "pipeline": {"id": 1711, "project_id": 11, "status": "failed", "source": "parent_pipeline", "archived": false},
+  "job": {
+    "id": 1701,
+    "name": "jest",
+    "status": "failed",
+    "runner": {"id": 17, "description": "shared runner", "runner_type": "instance_type", "status": "online"}
+  },
+  "test_report": {"total_count": 5, "failed_count": 2, "test_suites": [], "unknown_summary": {}}
+}
