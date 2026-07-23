@@ -25,3 +25,12 @@ gitlab:
   default-per-page: ${GITLAB_DEFAULT_PER_PAGE:20}
   max-per-page: ${GITLAB_MAX_PER_PAGE:100}
   max-jobs: ${GITLAB_MAX_JOBS:500}
+  token-file: ${GITLAB_TOKEN_FILE:}
+  connect-timeout: ${GITLAB_CONNECT_TIMEOUT:10s}
+  read-timeout: ${GITLAB_READ_TIMEOUT:60s}
+  proxy-url: ${GITLAB_PROXY_URL:}
+  ssl-bundle: ${GITLAB_SSL_BUNDLE:}
+  temp-directory: ${GITLAB_TEMP_DIRECTORY:}
+  max-download-bytes: ${GITLAB_MAX_DOWNLOAD_BYTES:100000000}
+  retry-attempts: ${GITLAB_RETRY_ATTEMPTS:2}
+  retry-backoff: ${GITLAB_RETRY_BACKOFF:500ms}

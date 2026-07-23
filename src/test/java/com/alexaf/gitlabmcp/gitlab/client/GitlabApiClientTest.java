@@ -1,6 +1,7 @@
 package com.alexaf.gitlabmcp.gitlab.client;
 
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabApiException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabForbiddenException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabRateLimitedException;
@@ -21,6 +22,7 @@ import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
 import java.io.ByteArrayOutputStream;
+import java.time.Duration;
 import java.util.List;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
@@ -207,7 +209,7 @@ class GitlabApiClientTest {
 
         assertThatThrownBy(() -> client.get("/user"))
                 .isInstanceOf(IllegalArgumentException.class)
-                .hasMessage("GITLAB_TOKEN must be set");
+                .hasMessage("GITLAB_TOKEN or GITLAB_TOKEN_FILE must be set");
     }
 
     @Test
@@ -343,6 +345,36 @@ class GitlabApiClientTest {
                 .isInstanceOf(GitlabRateLimitedException.class)
                 .satisfies(error -> assertThat(((GitlabRateLimitedException) error).retryAfter())
                         .hasSeconds(7));
+    }
+
+    @Test
+    void getRetriesTemporaryGitlabFailures() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GitlabApiClient client = client(properties("token", null, 1, 100_000_000L), builder);
+
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/user"))
+                .andRespond(withStatus(HttpStatus.SERVICE_UNAVAILABLE));
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/user"))
+                .andRespond(withSuccess("{\"id\":7}", MediaType.APPLICATION_JSON));
+
+        assertThat(client.get("/user")).contains("\"id\" : 7");
+        server.verify();
+    }
+
+    @Test
+    void downloadStopsWhenConfiguredByteLimitIsExceeded() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GitlabApiClient client = client(properties("token", null, 0, 4), builder);
+
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/1/jobs/8/trace"))
+                .andRespond(withSuccess("12345", MediaType.TEXT_PLAIN));
+
+        assertThatThrownBy(() -> client.getLimitedText("/projects/1/jobs/8/trace", 100))
+                .isInstanceOf(GitlabDownloadLimitException.class)
+                .hasMessageContaining("4 bytes");
+        server.verify();
     }
 
     private static Stream<Arguments> gitlabErrorStatuses() {
@@ -521,5 +553,29 @@ class GitlabApiClientTest {
 
     private GitlabApiClient client(GitlabProperties properties, RestClient.Builder builder) {
         return new GitlabApiClient(properties, objectMapper, builder);
+    }
+
+    private GitlabProperties properties(
+            String token,
+            String tokenFile,
+            int retryAttempts,
+            long maxDownloadBytes
+    ) {
+        return new GitlabProperties(
+                "https://gitlab.example",
+                token,
+                List.of(),
+                20,
+                100,
+                500,
+                tokenFile,
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(60),
+                null,
+                null,
+                null,
+                maxDownloadBytes,
+                retryAttempts,
+                Duration.ZERO);
     }
 }

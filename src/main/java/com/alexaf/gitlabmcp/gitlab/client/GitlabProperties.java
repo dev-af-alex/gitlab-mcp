@@ -2,6 +2,7 @@ package com.alexaf.gitlabmcp.gitlab.client;
 
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
+import java.time.Duration;
 import java.util.List;
 
 @ConfigurationProperties(prefix = "gitlab")
@@ -11,7 +12,16 @@ public record GitlabProperties(
         List<String> allowedProjects,
         int defaultPerPage,
         int maxPerPage,
-        int maxJobs
+        int maxJobs,
+        String tokenFile,
+        Duration connectTimeout,
+        Duration readTimeout,
+        String proxyUrl,
+        String sslBundle,
+        String tempDirectory,
+        long maxDownloadBytes,
+        int retryAttempts,
+        Duration retryBackoff
 ) {
 
     public GitlabProperties(
@@ -21,6 +31,21 @@ public record GitlabProperties(
             int defaultPerPage,
             int maxPerPage
     ) {
-        this(url, token, allowedProjects, defaultPerPage, maxPerPage, 500);
+        this(
+                url,
+                token,
+                allowedProjects,
+                defaultPerPage,
+                maxPerPage,
+                500,
+                null,
+                Duration.ofSeconds(10),
+                Duration.ofSeconds(60),
+                null,
+                null,
+                null,
+                100_000_000L,
+                0,
+                Duration.ZERO);
     }
 }
