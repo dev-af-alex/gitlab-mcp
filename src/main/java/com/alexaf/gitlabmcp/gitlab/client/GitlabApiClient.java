@@ -1,26 +1,18 @@
 package com.alexaf.gitlabmcp.gitlab.client;
 
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabApiException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabClientException;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.ArtifactArchiveReader;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabHttpTransport;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabQueryParameter;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.SecretRedactor;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDecodeException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabForbiddenException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabRateLimitedException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabServerException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabTransportException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabUnauthorizedException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpStatusCode;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
-import org.springframework.web.client.RestClientResponseException;
-import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
 import java.net.URI;
@@ -34,18 +26,14 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipFile;
 
 
 @Component
@@ -54,26 +42,35 @@ public class GitlabApiClient {
     private static final String TRUNCATED_SUFFIX = "\n[truncated to %d bytes]";
     private static final String TAIL_TRUNCATED_PREFIX = "[truncated to last %d bytes]\n";
     private static final int DEFAULT_TEXT_BYTES = 60_000;
-    private static final List<Pattern> SECRET_PATTERNS = List.of(
-            Pattern.compile("(?i)(\\bPRIVATE-TOKEN\\b\\s*[:=]\\s*)([^\\s'\";]+)"),
-            Pattern.compile("(?i)(\\b(?:password|passwd|secret|token|api[_-]?key|apikey|access[_-]?key|private[_-]?key|client[_-]?secret)\\b\\s*[:=]\\s*)([^\\s'\";]+)"),
-            Pattern.compile("(?i)(\\b[A-Z0-9_]*(?:PASSWORD|PASSWD|SECRET|TOKEN|API_KEY|APIKEY|ACCESS_KEY|PRIVATE_KEY|CLIENT_SECRET)[A-Z0-9_]*\\b\\s*=\\s*)([^\\s'\";]+)")
-    );
 
     private final GitlabProperties properties;
-    private final RestClient restClient;
     private final ObjectMapper objectMapper;
-    private final String apiUrl;
+    private final GitlabHttpTransport transport;
+    private final ArtifactArchiveReader artifactArchiveReader;
+    private final SecretRedactor secretRedactor;
     private final List<String> allowedProjects;
 
-    public GitlabApiClient(GitlabProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
+    @Autowired
+    public GitlabApiClient(
+            GitlabProperties properties,
+            ObjectMapper objectMapper,
+            GitlabHttpTransport transport,
+            ArtifactArchiveReader artifactArchiveReader,
+            SecretRedactor secretRedactor
+    ) {
         this.properties = properties;
         this.objectMapper = objectMapper;
-        this.apiUrl = normalizeApiUrl(properties.url());
+        this.transport = transport;
+        this.artifactArchiveReader = artifactArchiveReader;
+        this.secretRedactor = secretRedactor;
         this.allowedProjects = normalizeAllowedProjects(properties.allowedProjects());
-        this.restClient = restClientBuilder
-                .defaultHeader(HttpHeaders.ACCEPT, "application/json")
-                .build();
+    }
+
+    public GitlabApiClient(GitlabProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
+        this(properties, objectMapper,
+                new GitlabHttpTransport(properties, restClientBuilder),
+                new ArtifactArchiveReader(),
+                new SecretRedactor());
     }
 
     private static long numericGitlabId(String value, String name, List<Pattern> patterns) {
@@ -131,20 +128,6 @@ public class GitlabApiClient {
         return regex.append('$').toString();
     }
 
-    private static String normalizeArtifactDirectory(String path) {
-        if (!StringUtils.hasText(path)) {
-            return "";
-        }
-        String normalized = trimLeadingSlash(path.strip());
-        normalized = trimTrailingSlash(normalized);
-        return normalized.isBlank() ? "" : normalized + "/";
-    }
-
-    private static String fileName(String path) {
-        int index = path.lastIndexOf('/');
-        return index >= 0 ? path.substring(index + 1) : path;
-    }
-
     private static void deleteTempFile(Path file) {
         try {
             Files.deleteIfExists(file);
@@ -165,24 +148,6 @@ public class GitlabApiClient {
         } catch (Exception e) {
             return new String(bytes, offset, length, StandardCharsets.UTF_8);
         }
-    }
-
-    private static String normalizeApiUrl(String url) {
-        if (!StringUtils.hasText(url)) {
-            throw new IllegalArgumentException("GITLAB_URL must be set");
-        }
-        String trimmed = trimTrailingSlash(url.trim());
-        if (trimmed.endsWith("/api/v4")) {
-            return trimmed;
-        }
-        return trimmed + "/api/v4";
-    }
-
-    private static String requireToken(String token) {
-        if (!StringUtils.hasText(token)) {
-            throw new IllegalArgumentException("GITLAB_TOKEN must be set");
-        }
-        return token.trim();
     }
 
     private static String encodeProjectId(String projectId) {
@@ -333,18 +298,7 @@ public class GitlabApiClient {
     }
 
     public String getRawText(String path, QueryParam... queryParams) {
-        URI uri = uri(path, queryParams);
-        try {
-            return restClient.get()
-                    .uri(uri)
-                    .header("PRIVATE-TOKEN", requireToken(properties.token()))
-                    .retrieve()
-                    .body(String.class);
-        } catch (RestClientResponseException e) {
-            throw clientException(uri, e.getStatusCode(), e.getResponseHeaders(), e);
-        } catch (RestClientException e) {
-            throw new GitlabTransportException(uri, e);
-        }
+        return transport.getText(path, queryParameters(queryParams));
     }
 
     public String getLimitedText(String path, Integer maxBytes, QueryParam... queryParams) {
@@ -368,7 +322,7 @@ public class GitlabApiClient {
     public List<ArtifactFile> listArtifactArchive(String archivePath, String path, Boolean recursive, Integer page, Integer perPage) {
         Path file = downloadToTempFile(archivePath);
         try {
-            return page(listArchiveEntries(file, path, recursive), page, perPage);
+            return page(artifactArchiveReader.list(file, path, recursive), page, perPage);
         } finally {
             deleteTempFile(file);
         }
@@ -378,10 +332,7 @@ public class GitlabApiClient {
         Path file = downloadToTempFile(archivePath);
         try {
             Pattern compiled = compilePathPattern(pattern, regex);
-            List<ArtifactFile> matches = listArchiveEntries(file, null, true).stream()
-                    .filter(artifact -> "file".equals(artifact.type()))
-                    .filter(artifact -> compiled.matcher(artifact.path()).matches())
-                    .toList();
+            List<ArtifactFile> matches = artifactArchiveReader.find(file, compiled);
             return page(matches, page, perPage);
         } finally {
             deleteTempFile(file);
@@ -489,15 +440,7 @@ public class GitlabApiClient {
     }
 
     public String redactSecrets(String text) {
-        if (!StringUtils.hasText(text)) {
-            return text == null ? "" : text;
-        }
-        String redacted = text;
-        for (Pattern pattern : SECRET_PATTERNS) {
-            Matcher matcher = pattern.matcher(redacted);
-            redacted = matcher.replaceAll("$1[REDACTED]");
-        }
-        return redacted;
+        return secretRedactor.redact(text);
     }
 
     public String limitText(String text, Integer maxBytes) {
@@ -529,16 +472,6 @@ public class GitlabApiClient {
                 + decodeUtf8Slice(bytes, Math.max(0, bytes.length - maxBytes), maxBytes).stripLeading();
     }
 
-    private URI uri(String path, QueryParam... queryParams) {
-        UriComponentsBuilder builder = UriComponentsBuilder.fromUriString(apiUrl + path);
-        for (QueryParam queryParam : queryParams) {
-            if (queryParam.value() != null && StringUtils.hasText(queryParam.value().toString())) {
-                builder.queryParam(queryParam.name(), queryParam.value());
-            }
-        }
-        return builder.build(true).toUri();
-    }
-
     private String prettyJson(String response) {
         if (!StringUtils.hasText(response)) {
             return "";
@@ -552,34 +485,7 @@ public class GitlabApiClient {
     }
 
     private Path downloadToTempFile(String path, QueryParam... queryParams) {
-        URI uri = uri(path, queryParams);
-        try {
-            return restClient.get()
-                    .uri(uri)
-                    .header("PRIVATE-TOKEN", requireToken(properties.token()))
-                    .exchange((request, response) -> {
-                        HttpStatusCode status = response.getStatusCode();
-                        if (status.is4xxClientError()) {
-                            throw clientException(uri, status, response.getHeaders(), null);
-                        }
-                        if (status.is5xxServerError()) {
-                            throw new GitlabServerException(uri, status.value());
-                        }
-                        Path file = Files.createTempFile("gitlab-mcp-", ".tmp");
-                        try (var input = response.getBody();
-                             var output = Files.newOutputStream(file, StandardOpenOption.WRITE)) {
-                            input.transferTo(output);
-                        } catch (Exception e) {
-                            deleteTempFile(file);
-                            throw new IllegalArgumentException("Unable to stream GitLab response: " + uri, e);
-                        }
-                        return file;
-                    });
-        } catch (GitlabApiException e) {
-            throw e;
-        } catch (Exception e) {
-            throw new GitlabTransportException(uri, e);
-        }
+        return transport.download(path, queryParameters(queryParams));
     }
 
     private String readPrefixText(Path file, Integer maxBytes) {
@@ -613,41 +519,6 @@ public class GitlabApiClient {
         }
     }
 
-    private List<ArtifactFile> listArchiveEntries(Path file, String path, Boolean recursive) {
-        String normalizedPath = normalizeArtifactDirectory(path);
-        boolean recursiveMode = recursive == null || recursive;
-        try (ZipFile zipFile = new ZipFile(file.toFile())) {
-            return zipFile.stream()
-                    .filter(entry -> !entry.isDirectory())
-                    .map(entry -> artifactFile(entry, normalizedPath, recursiveMode))
-                    .flatMap(Optional::stream)
-                    .sorted(Comparator.comparing(ArtifactFile::path))
-                    .toList();
-        } catch (Exception e) {
-            throw new IllegalArgumentException("Unable to read GitLab artifacts archive", e);
-        }
-    }
-
-    private Optional<ArtifactFile> artifactFile(ZipEntry entry, String path, boolean recursive) {
-        String entryName = trimLeadingSlash(entry.getName());
-        if (!entryName.startsWith(path)) {
-            return Optional.empty();
-        }
-        String relative = entryName.substring(path.length());
-        if (relative.isBlank()) {
-            return Optional.empty();
-        }
-        if (!recursive && relative.contains("/")) {
-            return Optional.empty();
-        }
-        return Optional.of(new ArtifactFile(
-                fileName(entryName),
-                entryName,
-                "file",
-                entry.getSize() >= 0 ? entry.getSize() : null,
-                null));
-    }
-
     private byte[] readBytes(Path file, long start, int maxBytes) throws Exception {
         int length = (int) Math.min(Files.size(file) - start, maxBytes);
         byte[] bytes = new byte[length];
@@ -661,43 +532,10 @@ public class GitlabApiClient {
         return bytes;
     }
 
-    private GitlabApiException clientException(
-            URI uri,
-            HttpStatusCode status,
-            HttpHeaders headers,
-            Throwable cause
-    ) {
-        if (status.value() == 404) {
-            return new GitlabNotFoundException(uri, cause);
-        }
-        if (status.value() == 403) {
-            return new GitlabForbiddenException(uri, cause);
-        }
-        if (status.value() == 401) {
-            return new GitlabUnauthorizedException(uri, cause);
-        }
-        if (status.value() == 429) {
-            return new GitlabRateLimitedException(uri, retryAfter(headers), cause);
-        }
-        if (status.is5xxServerError()) {
-            return new GitlabServerException(uri, status.value(), cause);
-        }
-        return new GitlabClientException(uri, status.value(), cause);
-    }
-
-    private Duration retryAfter(HttpHeaders headers) {
-        if (headers == null) {
-            return null;
-        }
-        String value = headers.getFirst(HttpHeaders.RETRY_AFTER);
-        if (!StringUtils.hasText(value)) {
-            return null;
-        }
-        try {
-            return Duration.ofSeconds(Long.parseLong(value.trim()));
-        } catch (NumberFormatException ignored) {
-            return null;
-        }
+    private List<GitlabQueryParameter> queryParameters(QueryParam... queryParams) {
+        return Arrays.stream(queryParams)
+                .map(param -> new GitlabQueryParameter(param.name(), param.value()))
+                .toList();
     }
 
     private <T> T readValue(String response, Class<T> type) {
