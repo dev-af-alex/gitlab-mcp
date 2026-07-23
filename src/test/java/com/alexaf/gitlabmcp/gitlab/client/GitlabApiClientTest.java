@@ -568,6 +568,8 @@ class GitlabApiClientTest {
                 20,
                 100,
                 500,
+                20,
+                3,
                 tokenFile,
                 Duration.ofSeconds(10),
                 Duration.ofSeconds(60),

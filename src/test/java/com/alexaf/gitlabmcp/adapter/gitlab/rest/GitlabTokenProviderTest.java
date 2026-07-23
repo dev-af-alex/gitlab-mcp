@@ -27,6 +27,8 @@ class GitlabTokenProviderTest {
                 20,
                 100,
                 500,
+                20,
+                3,
                 tokenFile.toString(),
                 Duration.ofSeconds(10),
                 Duration.ofSeconds(60),

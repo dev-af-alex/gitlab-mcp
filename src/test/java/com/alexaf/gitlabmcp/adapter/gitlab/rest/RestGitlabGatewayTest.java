@@ -135,6 +135,37 @@ class RestGitlabGatewayTest {
     }
 
     @Test
+    void listsDownstreamPipelinesThroughBridgesOnGitlab15_1() {
+        server.expect(once(), requestTo(
+                        "https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/bridges"
+                                + "?page=1&per_page=100"))
+                .andRespond(withSuccess("""
+                        [{
+                          "id": 700,
+                          "name": "deploy downstream",
+                          "status": "failed",
+                          "downstream_pipeline": {
+                            "id": 84,
+                            "project_id": 12,
+                            "status": "failed",
+                            "web_url": "https://gitlab.example/group/child/-/pipelines/84"
+                          }
+                        }]
+                        """, MediaType.APPLICATION_JSON));
+
+        var bridges = gateway.getPipelineBridges("group/repo", "42", 20);
+
+        assertThat(bridges.items()).singleElement()
+                .satisfies(bridge -> {
+                    assertThat(bridge.id()).isEqualTo(700);
+                    assertThat(bridge.downstreamPipeline().id()).isEqualTo(84);
+                    assertThat(bridge.downstreamPipeline().projectId()).isEqualTo(12);
+                });
+        assertThat(bridges.truncated()).isFalse();
+        server.verify();
+    }
+
+    @Test
     void readsLanguageIndependentTestReportOnGitlab15_1() {
         server.expect(once(), requestTo(
                         "https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/test_report"))

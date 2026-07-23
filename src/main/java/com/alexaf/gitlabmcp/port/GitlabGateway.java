@@ -13,6 +13,7 @@ import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
 
 import java.util.List;
@@ -66,6 +67,12 @@ public interface GitlabGateway {
             String pipelineId,
             Boolean includeRetried,
             int maxJobs
+    );
+
+    GitlabPage<PipelineBridge> getPipelineBridges(
+            String projectId,
+            String pipelineId,
+            int maxBridges
     );
 
     Optional<GitlabTestReport> getPipelineTestReport(String projectId, String pipelineId);

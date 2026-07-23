@@ -15,6 +15,7 @@ import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -168,6 +169,21 @@ public class RestGitlabGateway implements GitlabGateway {
                 Job.class,
                 maxJobs,
                 gitlab.param("include_retried", includeRetried),
+                gitlab.param("page", 1),
+                gitlab.param("per_page", 100));
+    }
+
+    @Override
+    public GitlabPage<PipelineBridge> getPipelineBridges(
+            String projectId,
+            String pipelineId,
+            int maxBridges
+    ) {
+        long id = gitlab.pipelineId(pipelineId);
+        return gitlab.getAllPages(
+                projectApi(projectId) + "/pipelines/" + id + "/bridges",
+                PipelineBridge.class,
+                maxBridges,
                 gitlab.param("page", 1),
                 gitlab.param("per_page", 100));
     }
