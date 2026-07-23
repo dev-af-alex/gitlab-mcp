@@ -6,6 +6,7 @@ import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabRateLimitedException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabServerException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabUnauthorizedException;
+import com.alexaf.gitlabmcp.gitlab.dto.Project;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,7 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
@@ -247,6 +249,60 @@ class GitlabApiClientTest {
                 .andRespond(withSuccess("{not-json}\nline 2", MediaType.TEXT_PLAIN));
 
         assertThat(client.getRawText("/projects/1/jobs/8/trace")).isEqualTo("{not-json}\nline 2");
+        server.verify();
+    }
+
+    @Test
+    void getAllPagesFollowsGitlabLinkHeader() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GitlabApiClient client = client(
+                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
+                builder);
+        String nextPage = "https://gitlab.example/api/v4/projects?page=2&per_page=1";
+
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/projects?page=1&per_page=1"))
+                .andRespond(withSuccess("[{\"id\":1,\"name\":\"one\"}]", MediaType.APPLICATION_JSON)
+                        .header(HttpHeaders.LINK, "<" + nextPage + ">; rel=\"next\""));
+        server.expect(once(), requestTo(nextPage))
+                .andRespond(withSuccess("[{\"id\":2,\"name\":\"two\"}]", MediaType.APPLICATION_JSON));
+
+        var page = client.getAllPages(
+                "/projects",
+                Project.class,
+                10,
+                client.param("page", 1),
+                client.param("per_page", 1));
+
+        assertThat(page.items()).extracting(Project::id).containsExactly(1L, 2L);
+        assertThat(page.totalFetched()).isEqualTo(2);
+        assertThat(page.nextLink()).isNull();
+        assertThat(page.truncated()).isFalse();
+        server.verify();
+    }
+
+    @Test
+    void getAllPagesStopsAtConfiguredItemLimit() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GitlabApiClient client = client(
+                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
+                builder);
+
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/projects?per_page=100"))
+                .andRespond(withSuccess("""
+                        [{"id": 1, "name": "one"}, {"id": 2, "name": "two"}]
+                        """, MediaType.APPLICATION_JSON));
+
+        var page = client.getAllPages(
+                "/projects",
+                Project.class,
+                1,
+                client.param("per_page", 100));
+
+        assertThat(page.items()).extracting(Project::id).containsExactly(1L);
+        assertThat(page.totalFetched()).isEqualTo(1);
+        assertThat(page.truncated()).isTrue();
         server.verify();
     }
 

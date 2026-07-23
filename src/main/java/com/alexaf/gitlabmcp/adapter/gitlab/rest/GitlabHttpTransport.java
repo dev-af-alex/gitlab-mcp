@@ -41,13 +41,21 @@ public class GitlabHttpTransport {
     }
 
     public String getText(String path, List<GitlabQueryParameter> queryParameters) {
-        URI uri = uri(path, queryParameters);
+        return get(path, queryParameters).body();
+    }
+
+    public GitlabHttpResponse get(String path, List<GitlabQueryParameter> queryParameters) {
+        return get(uri(path, queryParameters));
+    }
+
+    public GitlabHttpResponse get(URI uri) {
         try {
-            return restClient.get()
+            var response = restClient.get()
                     .uri(uri)
                     .header("PRIVATE-TOKEN", requireToken(properties.token()))
                     .retrieve()
-                    .body(String.class);
+                    .toEntity(String.class);
+            return new GitlabHttpResponse(response.getBody(), response.getHeaders());
         } catch (RestClientResponseException e) {
             throw exception(uri, e.getStatusCode(), e.getResponseHeaders(), e);
         } catch (RestClientException e) {

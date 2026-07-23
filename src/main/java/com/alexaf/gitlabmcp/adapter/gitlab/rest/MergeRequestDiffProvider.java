@@ -13,6 +13,8 @@ import java.util.List;
 @Component
 public class MergeRequestDiffProvider {
 
+    private static final int MAX_DIFF_FILES = 1_000;
+
     private final GitlabApiClient gitlab;
     private final GitlabServerInfoProvider serverInfoProvider;
 
@@ -29,11 +31,12 @@ public class MergeRequestDiffProvider {
             return legacyChanges(mergeRequestApi);
         }
         try {
-            List<FileChange> diffs = gitlab.getList(
+            List<FileChange> diffs = gitlab.getAllPages(
                     mergeRequestApi + "/diffs",
                     FileChange.class,
+                    MAX_DIFF_FILES,
                     gitlab.param("page", 1),
-                    gitlab.param("per_page", 100));
+                    gitlab.param("per_page", 100)).items();
             MergeRequest mergeRequest = gitlab.getObject(mergeRequestApi, MergeRequest.class);
             return changes(mergeRequest, diffs);
         } catch (GitlabNotFoundException unsupportedEndpoint) {

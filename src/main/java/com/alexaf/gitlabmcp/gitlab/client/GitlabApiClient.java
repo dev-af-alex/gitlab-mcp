@@ -2,8 +2,10 @@ package com.alexaf.gitlabmcp.gitlab.client;
 
 import com.alexaf.gitlabmcp.adapter.gitlab.rest.ArtifactArchiveReader;
 import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabHttpTransport;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabHttpResponse;
 import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabQueryParameter;
 import com.alexaf.gitlabmcp.adapter.gitlab.rest.SecretRedactor;
+import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDecodeException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.fasterxml.jackson.databind.JavaType;
@@ -348,6 +350,48 @@ public class GitlabApiClient {
         return readValue(get(path, queryParams), type);
     }
 
+    public <T> GitlabPage<T> getPage(String path, Class<T> itemType, QueryParam... queryParams) {
+        GitlabHttpResponse response = transport.get(path, queryParameters(queryParams));
+        List<T> items = readList(response.body(), itemType);
+        return new GitlabPage<>(
+                items,
+                response.nextLink() == null ? null : response.nextLink().toString(),
+                items.size(),
+                false);
+    }
+
+    public <T> GitlabPage<T> getAllPages(
+            String path,
+            Class<T> itemType,
+            int maxItems,
+            QueryParam... queryParams
+    ) {
+        int effectiveMaxItems = Math.max(1, maxItems);
+        GitlabHttpResponse response = transport.get(path, queryParameters(queryParams));
+        List<T> collected = new ArrayList<>();
+        while (true) {
+            List<T> pageItems = readList(response.body(), itemType);
+            int remaining = effectiveMaxItems - collected.size();
+            if (pageItems.size() > remaining) {
+                collected.addAll(pageItems.subList(0, remaining));
+                return new GitlabPage<>(
+                        collected,
+                        response.nextLink() == null ? null : response.nextLink().toString(),
+                        collected.size(),
+                        true);
+            }
+            collected.addAll(pageItems);
+            URI nextLink = response.nextLink();
+            if (nextLink == null) {
+                return new GitlabPage<>(collected, null, collected.size(), false);
+            }
+            if (collected.size() >= effectiveMaxItems) {
+                return new GitlabPage<>(collected, nextLink.toString(), collected.size(), true);
+            }
+            response = transport.get(nextLink);
+        }
+    }
+
     public String json(Object value) {
         try {
             return objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(value);
@@ -552,6 +596,11 @@ public class GitlabApiClient {
         } catch (Exception e) {
             throw new GitlabDecodeException("", e);
         }
+    }
+
+    private <T> List<T> readList(String response, Class<T> itemType) {
+        JavaType type = objectMapper.getTypeFactory().constructCollectionType(List.class, itemType);
+        return readValue(response, type);
     }
 
     private void requireProjectAllowed(String normalizedProjectId, String originalProjectId) {
