@@ -7,6 +7,10 @@
   "icon": "https://avatars.githubusercontent.com/u/1086321?s=200&v=4",
   "tools": [
     {
+      "name": "gitlab_get_server_info",
+      "description": "Get the GitLab version, minimum supported version, and detected API capabilities."
+    },
+    {
       "name": "gitlab_get_current_user",
       "description": "Get the GitLab user associated with the configured token."
     },
@@ -64,7 +68,7 @@
     },
     {
       "name": "gitlab_list_job_artifacts",
-      "description": "List files in a GitLab job artifacts ZIP archive by job id or URL without using /artifacts/tree."
+      "description": "List GitLab job artifact files using server metadata when supported, with a bounded ZIP fallback."
     },
     {
       "name": "gitlab_find_job_artifact_files",
@@ -84,7 +88,7 @@
     },
     {
       "name": "gitlab_analyze_failed_pipeline",
-      "description": "Analyze a failed GitLab pipeline by pipeline id/URL or merge request IID/URL with compact root cause, failed tests, and cascade grouping. Full trace/report context and diffs are opt-in."
+      "description": "Analyze a root and bounded downstream pipeline graph using GitLab/JUnit reports and Maven, Gradle, Jest, pytest, or generic traces."
     },
     {
       "name": "gitlab_analyze_mr_pipeline_failure",
@@ -128,6 +132,56 @@
           "default": 100,
           "minimum": 1,
           "maximum": 100
+        },
+        "max_jobs": {
+          "type": "number",
+          "description": "Maximum jobs collected across the root and downstream pipeline graph.",
+          "default": 500,
+          "minimum": 1
+        },
+        "max_pipelines": {
+          "type": "number",
+          "description": "Maximum root and downstream pipelines collected per diagnosis.",
+          "default": 20,
+          "minimum": 1
+        },
+        "max_pipeline_depth": {
+          "type": "number",
+          "description": "Maximum downstream pipeline traversal depth.",
+          "default": 3,
+          "minimum": 0
+        },
+        "connect_timeout": {
+          "type": "string",
+          "description": "GitLab HTTP connection timeout as a duration.",
+          "default": "10s"
+        },
+        "read_timeout": {
+          "type": "string",
+          "description": "GitLab HTTP read timeout as a duration.",
+          "default": "60s"
+        },
+        "proxy_url": {
+          "type": "string",
+          "description": "Optional HTTP or HTTPS proxy URL.",
+          "default": ""
+        },
+        "max_download_bytes": {
+          "type": "number",
+          "description": "Maximum bytes downloaded for one artifact archive.",
+          "default": 100000000,
+          "minimum": 1
+        },
+        "retry_attempts": {
+          "type": "number",
+          "description": "Retries for idempotent requests after 429, 502, or 503.",
+          "default": 2,
+          "minimum": 0
+        },
+        "retry_backoff": {
+          "type": "string",
+          "description": "Base retry delay when Retry-After is absent.",
+          "default": "500ms"
         }
       }
     }
@@ -148,6 +202,42 @@
     {
       "name": "GITLAB_MAX_PER_PAGE",
       "value": "{{gitlab-mcp.max_per_page}}"
+    },
+    {
+      "name": "GITLAB_MAX_JOBS",
+      "value": "{{gitlab-mcp.max_jobs}}"
+    },
+    {
+      "name": "GITLAB_MAX_PIPELINES",
+      "value": "{{gitlab-mcp.max_pipelines}}"
+    },
+    {
+      "name": "GITLAB_MAX_PIPELINE_DEPTH",
+      "value": "{{gitlab-mcp.max_pipeline_depth}}"
+    },
+    {
+      "name": "GITLAB_CONNECT_TIMEOUT",
+      "value": "{{gitlab-mcp.connect_timeout}}"
+    },
+    {
+      "name": "GITLAB_READ_TIMEOUT",
+      "value": "{{gitlab-mcp.read_timeout}}"
+    },
+    {
+      "name": "GITLAB_PROXY_URL",
+      "value": "{{gitlab-mcp.proxy_url}}"
+    },
+    {
+      "name": "GITLAB_MAX_DOWNLOAD_BYTES",
+      "value": "{{gitlab-mcp.max_download_bytes}}"
+    },
+    {
+      "name": "GITLAB_RETRY_ATTEMPTS",
+      "value": "{{gitlab-mcp.retry_attempts}}"
+    },
+    {
+      "name": "GITLAB_RETRY_BACKOFF",
+      "value": "{{gitlab-mcp.retry_backoff}}"
     }
   ]
 }
