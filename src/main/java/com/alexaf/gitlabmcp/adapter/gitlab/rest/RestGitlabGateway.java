@@ -1,6 +1,7 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
 import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
@@ -13,6 +14,7 @@ import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
@@ -21,9 +23,24 @@ import java.util.List;
 public class RestGitlabGateway implements GitlabGateway {
 
     private final GitlabApiClient gitlab;
+    private final GitlabServerInfoProvider serverInfoProvider;
+
+    @Autowired
+    public RestGitlabGateway(
+            GitlabApiClient gitlab,
+            GitlabServerInfoProvider serverInfoProvider
+    ) {
+        this.gitlab = gitlab;
+        this.serverInfoProvider = serverInfoProvider;
+    }
 
     public RestGitlabGateway(GitlabApiClient gitlab) {
-        this.gitlab = gitlab;
+        this(gitlab, new GitlabServerInfoProvider(gitlab, new GitlabCapabilityResolver()));
+    }
+
+    @Override
+    public GitlabServerInfo getServerInfo() {
+        return serverInfoProvider.get();
     }
 
     @Override

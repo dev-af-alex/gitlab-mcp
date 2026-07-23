@@ -3,6 +3,8 @@ package com.alexaf.gitlabmcp.tool.gitlab;
 import com.alexaf.gitlabmcp.application.JsonResponseWriter;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
+import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
+import com.alexaf.gitlabmcp.domain.GitlabVersion;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.ArtifactHintDetector;
@@ -92,6 +94,23 @@ class GitlabToolComponentsTest {
         assertThat(response).isEqualTo("json");
         verify(gateway).getCurrentUser();
         verify(responseWriter).write(user);
+    }
+
+    @Test
+    void getServerInfoDelegatesToGatewayAndSerializesResponse() {
+        GitlabServerInfo info = new GitlabServerInfo(
+                GitlabVersion.parse("15.1.0-ee"),
+                "abc123",
+                java.util.Set.of(),
+                GitlabVersion.of(15, 1, 0),
+                true);
+        when(gateway.getServerInfo()).thenReturn(info);
+
+        String response = projectTools.getServerInfo();
+
+        assertThat(response).isEqualTo("json");
+        verify(gateway).getServerInfo();
+        verify(responseWriter).write(info);
     }
 
     @Test

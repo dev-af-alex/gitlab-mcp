@@ -28,6 +28,14 @@ public class GitlabProjectTools {
     }
 
     @McpTool(
+            name = "gitlab_get_server_info",
+            description = "Get the connected GitLab version and supported API capabilities.",
+            annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
+    public String getServerInfo() {
+        return responseWriter.write(gitlab.getServerInfo());
+    }
+
+    @McpTool(
             name = "gitlab_search_projects",
             description = "Search visible GitLab projects. Read-only.",
             annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))

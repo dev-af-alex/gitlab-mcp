@@ -2,6 +2,7 @@ package com.alexaf.gitlabmcp.port;
 
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
+import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.Commit;
 import com.alexaf.gitlabmcp.gitlab.dto.CurrentUser;
@@ -15,6 +16,8 @@ import com.alexaf.gitlabmcp.gitlab.dto.Project;
 import java.util.List;
 
 public interface GitlabGateway {
+
+    GitlabServerInfo getServerInfo();
 
     CurrentUser getCurrentUser();
 

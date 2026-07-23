@@ -77,4 +77,20 @@ class RestGitlabGatewayTest {
                 });
         server.verify();
     }
+
+    @Test
+    void readsAndCachesGitlabServerInformation() {
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/version"))
+                .andRespond(withSuccess("""
+                        {"version": "15.1.0-ee", "revision": "abc123"}
+                        """, MediaType.APPLICATION_JSON));
+
+        var first = gateway.getServerInfo();
+        var second = gateway.getServerInfo();
+
+        assertThat(first).isSameAs(second);
+        assertThat(first.version().raw()).isEqualTo("15.1.0-ee");
+        assertThat(first.supported()).isTrue();
+        server.verify();
+    }
 }
