@@ -1,6 +1,6 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.PipelineDiagnosticsService;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
@@ -10,11 +10,14 @@ import org.springframework.stereotype.Component;
 @Component
 public class GitlabDiagnosticsTools {
 
-    private final GitlabApiClient gitlab;
+    private final JsonResponseWriter responseWriter;
     private final PipelineDiagnosticsService diagnosticsService;
 
-    public GitlabDiagnosticsTools(GitlabApiClient gitlab, PipelineDiagnosticsService diagnosticsService) {
-        this.gitlab = gitlab;
+    public GitlabDiagnosticsTools(
+            JsonResponseWriter responseWriter,
+            PipelineDiagnosticsService diagnosticsService
+    ) {
+        this.responseWriter = responseWriter;
         this.diagnosticsService = diagnosticsService;
     }
 
@@ -39,7 +42,7 @@ public class GitlabDiagnosticsTools {
             Integer maxMatches,
             @McpToolParam(description = "Maximum trace tail bytes to inspect. Defaults to 60000.", required = false)
             Integer maxBytes) {
-        return gitlab.json(diagnosticsService.traceMatches(
+        return responseWriter.write(diagnosticsService.traceMatches(
                 projectId,
                 jobId,
                 pattern,
@@ -63,7 +66,7 @@ public class GitlabDiagnosticsTools {
             Integer maxBytes,
             @McpToolParam(description = "Include raw report evidence and trace context. Defaults to false.", required = false)
             Boolean includeDetails) {
-        return gitlab.json(diagnosticsService.extractJobFailureSummary(
+        return responseWriter.write(diagnosticsService.extractJobFailureSummary(
                 projectId,
                 jobId,
                 GitlabToolSupport.defaultMaxBytes(maxBytes),
@@ -83,7 +86,8 @@ public class GitlabDiagnosticsTools {
             String classNamePattern,
             @McpToolParam(description = "Maximum report files to inspect. Defaults to 5, capped at 20.", required = false)
             Integer maxReports) {
-        return gitlab.json(diagnosticsService.analyzeJobSurefireReports(projectId, jobId, classNamePattern, maxReports));
+        return responseWriter.write(
+                diagnosticsService.analyzeJobSurefireReports(projectId, jobId, classNamePattern, maxReports));
     }
 
     @McpTool(
@@ -107,7 +111,7 @@ public class GitlabDiagnosticsTools {
             Boolean includeArtifactHints,
             @McpToolParam(description = "Include full trace contexts, report evidence, and merge-request diffs. Defaults to false.", required = false)
             Boolean includeDetails) {
-        return gitlab.json(diagnosticsService.analyze(
+        return responseWriter.write(diagnosticsService.analyze(
                 projectId,
                 pipelineId,
                 mergeRequestIid,
@@ -133,7 +137,7 @@ public class GitlabDiagnosticsTools {
             Boolean includeRawTraces,
             @McpToolParam(description = "Include full trace contexts, report evidence, and merge-request diffs. Defaults to false.", required = false)
             Boolean includeDetails) {
-        return gitlab.json(diagnosticsService.analyzeMergeRequestPipelineFailure(
+        return responseWriter.write(diagnosticsService.analyzeMergeRequestPipelineFailure(
                 projectId,
                 mergeRequestIid,
                 GitlabToolSupport.defaultMaxBytes(maxTraceBytesPerJob),

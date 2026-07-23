@@ -1,7 +1,7 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
-import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.springframework.ai.mcp.annotation.McpResource;
 import org.springframework.stereotype.Component;
 
@@ -13,10 +13,12 @@ public class GitlabResources {
 
     private static final int DEFAULT_RESOURCE_BYTES = 60_000;
 
-    private final GitlabApiClient gitlab;
+    private final GitlabGateway gitlab;
+    private final JsonResponseWriter responseWriter;
 
-    public GitlabResources(GitlabApiClient gitlab) {
+    public GitlabResources(GitlabGateway gitlab, JsonResponseWriter responseWriter) {
         this.gitlab = gitlab;
+        this.responseWriter = responseWriter;
     }
 
     private static String decode(String value) {
@@ -30,9 +32,7 @@ public class GitlabResources {
             description = "Read a GitLab pipeline summary as JSON. projectId must be a numeric id or URL-encoded path.",
             mimeType = "application/json")
     public String pipelineSummary(String projectId, String pipelineId) {
-        String projectPath = gitlab.projectPath(projectId);
-        long id = gitlab.pipelineId(pipelineId);
-        return gitlab.json(gitlab.getObject("/projects/" + projectPath + "/pipelines/" + id, Pipeline.class));
+        return responseWriter.write(gitlab.getPipeline(decode(projectId), pipelineId));
     }
 
     @McpResource(
@@ -42,9 +42,7 @@ public class GitlabResources {
             description = "Read a redacted GitLab job trace. projectId must be a numeric id or URL-encoded path."
     )
     public String jobTrace(String projectId, String jobId) {
-        String projectPath = gitlab.projectPath(projectId);
-        long id = gitlab.jobId(jobId);
-        return gitlab.getTailText("/projects/" + projectPath + "/jobs/" + id + "/trace", DEFAULT_RESOURCE_BYTES);
+        return gitlab.getJobTraceTail(decode(projectId), jobId, DEFAULT_RESOURCE_BYTES);
     }
 
     @McpResource(
@@ -54,9 +52,10 @@ public class GitlabResources {
             description = "Read one redacted text file from GitLab job artifacts. projectId and artifactPath must be URL-encoded when they contain slashes."
     )
     public String jobArtifactFile(String projectId, String jobId, String artifactPath) {
-        String projectPath = gitlab.projectPath(projectId);
-        long id = gitlab.jobId(jobId);
-        return gitlab.getLimitedText("/projects/" + projectPath + "/jobs/" + id
-                + "/artifacts/" + decode(artifactPath), DEFAULT_RESOURCE_BYTES);
+        return gitlab.getJobArtifactFile(
+                decode(projectId),
+                jobId,
+                decode(artifactPath),
+                DEFAULT_RESOURCE_BYTES);
     }
 }

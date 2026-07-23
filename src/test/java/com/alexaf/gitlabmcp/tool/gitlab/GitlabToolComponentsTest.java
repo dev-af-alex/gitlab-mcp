@@ -81,7 +81,7 @@ class GitlabToolComponentsTest {
         mergeRequestTools = new GitlabMergeRequestTools(gateway, responseWriter);
         pipelineTools = new GitlabPipelineTools(gateway, responseWriter);
         jobTools = new GitlabJobTools(gateway, responseWriter);
-        diagnosticsTools = new GitlabDiagnosticsTools(gitlab, diagnosticsService);
+        diagnosticsTools = new GitlabDiagnosticsTools(responseWriter, diagnosticsService);
     }
 
     @Test
@@ -327,7 +327,7 @@ class GitlabToolComponentsTest {
         assertThat(response).isEqualTo("json");
         assertThat(diagnosticsService.lastCall).isEqualTo(new DiagnosticCall(
                 "group/repo", "pipeline-url", null, true, 4096, false, false, false));
-        assertThat(gitlab.jsonInput).isSameAs(result);
+        verify(responseWriter).write(result);
     }
 
     private record Call(String path, Class<?> type, List<GitlabApiClient.QueryParam> params) {
