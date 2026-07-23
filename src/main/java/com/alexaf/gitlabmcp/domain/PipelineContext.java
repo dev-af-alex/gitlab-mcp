@@ -16,7 +16,8 @@ public record PipelineContext(
         Map<Long, List<ArtifactFile>> artifacts,
         GitlabTestReport testReport,
         boolean jobsTruncated,
-        int totalJobsFetched
+        int totalJobsFetched,
+        PipelineGraph graph
 ) {
 
     public PipelineContext {
@@ -27,6 +28,21 @@ public record PipelineContext(
                 .collect(java.util.stream.Collectors.toUnmodifiableMap(
                         Map.Entry::getKey,
                         entry -> List.copyOf(entry.getValue())));
+        graph = graph == null ? PipelineGraph.root("", pipeline) : graph;
+    }
+
+    public PipelineContext(
+            Pipeline pipeline,
+            List<Job> jobs,
+            Map<Long, String> traces,
+            Map<String, String> junitReports,
+            Map<Long, List<ArtifactFile>> artifacts,
+            GitlabTestReport testReport,
+            boolean jobsTruncated,
+            int totalJobsFetched
+    ) {
+        this(pipeline, jobs, traces, junitReports, artifacts, testReport,
+                jobsTruncated, totalJobsFetched, null);
     }
 
     public PipelineContext(
@@ -69,6 +85,7 @@ public record PipelineContext(
                 artifacts,
                 testReport,
                 jobsTruncated,
-                totalJobsFetched);
+                totalJobsFetched,
+                graph);
     }
 }

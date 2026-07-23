@@ -7,6 +7,7 @@ import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.junit.jupiter.api.Test;
 
@@ -92,6 +93,48 @@ class DefaultPipelineContextCollectorTest {
         assertThat(context.artifacts()).containsEntry(7L, List.of(junit));
         assertThat(context.junitReports())
                 .containsEntry("7:reports/jest-junit.xml", "<testsuite/>");
+    }
+
+    @Test
+    void collectsJobsFromBoundedDownstreamPipelineGraph() {
+        Pipeline root = pipeline(42L, "failed");
+        Pipeline child = new Pipeline(84L, 1L, 12L, "def456", "main", "failed",
+                "pipeline", null, null, null, null, 30L, 1L,
+                "https://gitlab.example/child/-/pipelines/84");
+        PipelineBridge bridge = new PipelineBridge(
+                700L, "child pipeline", "test", "failed", child);
+        Job rootJob = job(7L);
+        Job childJob = job(8L);
+        DefaultPipelineContextCollector graphCollector =
+                new DefaultPipelineContextCollector(gitlab, 5, 3, 2);
+
+        when(gitlab.getPipeline("group/repo", "42")).thenReturn(root);
+        when(gitlab.getPipelineBridges("group/repo", "42", 2))
+                .thenReturn(new GitlabPage<>(List.of(bridge), null, 1, false));
+        when(gitlab.getPipelineBridges("12", "84", 1))
+                .thenReturn(new GitlabPage<>(List.of(), null, 0, false));
+        when(gitlab.getPipelineJobs("group/repo", "42", false, 5))
+                .thenReturn(new GitlabPage<>(List.of(rootJob), null, 1, false));
+        when(gitlab.getPipelineJobs("12", "84", false, 4))
+                .thenReturn(new GitlabPage<>(List.of(childJob), null, 1, false));
+        when(gitlab.getPipelineTestReport("group/repo", "42")).thenReturn(Optional.empty());
+
+        var context = graphCollector.collect(
+                "group/repo",
+                "42",
+                null,
+                new PipelineCollectionOptions(false, 1, false, 1, 1, 1));
+
+        assertThat(context.jobs()).containsExactly(rootJob, childJob);
+        assertThat(context.graph().nodes()).hasSize(2);
+        assertThat(context.graph().nodes().get(1).projectId()).isEqualTo("12");
+        assertThat(context.graph().edges()).singleElement()
+                .satisfies(edge -> {
+                    assertThat(edge.sourcePipelineId()).isEqualTo(42);
+                    assertThat(edge.targetPipelineId()).isEqualTo(84);
+                    assertThat(edge.bridgeJobId()).isEqualTo(700);
+                });
+        assertThat(context.graph().truncated()).isFalse();
     }
 
     private static Pipeline pipeline(Long id, String status) {

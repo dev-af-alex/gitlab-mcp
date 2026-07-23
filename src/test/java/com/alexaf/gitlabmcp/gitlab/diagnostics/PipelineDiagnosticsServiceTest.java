@@ -73,7 +73,7 @@ class PipelineDiagnosticsServiceTest {
         PipelineDiagnosticsResult result = service.analyze("group/repo", "pipeline-url", null, true, 4096, true, true);
 
         assertThat(gitlab.projectIdInput).isEqualTo("group/repo");
-        assertThat(gitlab.pipelineIdInputs).containsExactly("pipeline-url", "pipeline-url", "123");
+        assertThat(gitlab.pipelineIdInputs).containsExactly("pipeline-url", "123", "pipeline-url", "123");
         assertThat(result.pipeline().id()).isEqualTo(123L);
         assertThat(result.summary()).contains("Pipeline 123 failed in 1 job(s)");
         assertThat(result.failedJobs()).hasSize(1);

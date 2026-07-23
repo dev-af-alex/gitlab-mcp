@@ -4,34 +4,55 @@ import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
+import com.alexaf.gitlabmcp.domain.PipelineEdge;
+import com.alexaf.gitlabmcp.domain.PipelineGraph;
+import com.alexaf.gitlabmcp.domain.PipelineNode;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
 import com.alexaf.gitlabmcp.port.PipelineContextCollector;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 @Component
 public class DefaultPipelineContextCollector implements PipelineContextCollector {
 
     private final GitlabGateway gitlab;
     private final int maxJobs;
+    private final int maxPipelines;
+    private final int maxPipelineDepth;
 
     public DefaultPipelineContextCollector(GitlabGateway gitlab, GitlabProperties properties) {
-        this(gitlab, properties.maxJobs());
+        this(gitlab, properties.maxJobs(), properties.maxPipelines(), properties.maxPipelineDepth());
     }
 
     public DefaultPipelineContextCollector(GitlabGateway gitlab, int maxJobs) {
+        this(gitlab, maxJobs, 20, 3);
+    }
+
+    public DefaultPipelineContextCollector(
+            GitlabGateway gitlab,
+            int maxJobs,
+            int maxPipelines,
+            int maxPipelineDepth
+    ) {
         this.gitlab = gitlab;
         this.maxJobs = Math.max(1, maxJobs);
+        this.maxPipelines = Math.max(1, maxPipelines);
+        this.maxPipelineDepth = Math.max(0, maxPipelineDepth);
     }
 
     @Override
@@ -42,36 +63,122 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             PipelineCollectionOptions options
     ) {
         Pipeline pipeline = resolvePipeline(projectId, pipelineId, mergeRequestIid);
-        String jobsPipelineId = StringUtils.hasText(pipelineId)
+        String rootJobsPipelineId = StringUtils.hasText(pipelineId)
                 ? pipelineId
                 : String.valueOf(pipeline.id());
-        GitlabPage<Job> jobs = gitlab.getPipelineJobs(
-                projectId,
-                jobsPipelineId,
-                false,
-                maxJobs);
+        PipelineGraph graph = collectGraph(projectId, pipeline);
+        List<Job> jobs = new ArrayList<>();
+        Map<Long, String> jobProjects = new LinkedHashMap<>();
+        boolean jobsTruncated = false;
+        int totalJobsFetched = 0;
+        for (PipelineNode node : graph.nodes()) {
+            int remainingJobs = maxJobs - totalJobsFetched;
+            if (remainingJobs <= 0) {
+                jobsTruncated = true;
+                break;
+            }
+            String jobsPipelineId = node.depth() == 0
+                    ? rootJobsPipelineId
+                    : String.valueOf(node.pipeline().id());
+            GitlabPage<Job> page = gitlab.getPipelineJobs(
+                    node.projectId(),
+                    jobsPipelineId,
+                    false,
+                    remainingJobs);
+            jobs.addAll(page.items());
+            page.items().forEach(job -> jobProjects.put(job.id(), node.projectId()));
+            totalJobsFetched += page.totalFetched();
+            jobsTruncated |= page.truncated();
+        }
         var testReport = gitlab.getPipelineTestReport(
                 projectId,
                 String.valueOf(pipeline.id()));
         Map<Long, String> traces = new LinkedHashMap<>();
         Map<Long, List<ArtifactFile>> artifacts = new LinkedHashMap<>();
         Map<String, String> junitReports = new LinkedHashMap<>();
-        for (Job job : jobs.items()) {
+        for (Job job : jobs) {
             if (!"failed".equals(job.status())) {
                 continue;
             }
-            collectTrace(projectId, job, options, traces);
-            collectArtifacts(projectId, job, options, artifacts, junitReports);
+            String jobProjectId = jobProjects.getOrDefault(job.id(), projectId);
+            collectTrace(jobProjectId, job, options, traces);
+            collectArtifacts(jobProjectId, job, options, artifacts, junitReports);
         }
         return new PipelineContext(
                 pipeline,
-                jobs.items(),
+                jobs,
                 traces,
                 junitReports,
                 artifacts,
                 testReport.orElse(null),
-                jobs.truncated(),
-                jobs.totalFetched());
+                jobsTruncated,
+                totalJobsFetched,
+                graph);
+    }
+
+    private PipelineGraph collectGraph(String projectId, Pipeline root) {
+        List<PipelineNode> nodes = new ArrayList<>();
+        List<PipelineEdge> edges = new ArrayList<>();
+        ArrayDeque<PipelineNode> queue = new ArrayDeque<>();
+        Set<String> seen = new HashSet<>();
+        PipelineNode rootNode = new PipelineNode(projectId, root, 0);
+        nodes.add(rootNode);
+        queue.add(rootNode);
+        seen.add(pipelineKey(projectId, root.id()));
+        boolean truncated = false;
+        while (!queue.isEmpty()) {
+            PipelineNode current = queue.removeFirst();
+            int remainingCapacity = maxPipelines - nodes.size();
+            GitlabPage<PipelineBridge> bridges;
+            try {
+                bridges = gitlab.getPipelineBridges(
+                        current.projectId(),
+                        String.valueOf(current.pipeline().id()),
+                        Math.max(1, remainingCapacity));
+            } catch (GitlabNotFoundException unavailable) {
+                continue;
+            }
+            if (bridges == null) {
+                continue;
+            }
+            truncated |= bridges.truncated();
+            for (PipelineBridge bridge : bridges.items()) {
+                Pipeline downstream = bridge.downstreamPipeline();
+                if (downstream == null || downstream.id() == null) {
+                    continue;
+                }
+                String downstreamProjectId = downstream.projectId() == null
+                        ? current.projectId()
+                        : String.valueOf(downstream.projectId());
+                edges.add(new PipelineEdge(
+                        current.projectId(),
+                        current.pipeline().id(),
+                        downstreamProjectId,
+                        downstream.id(),
+                        bridge.id(),
+                        bridge.name()));
+                String key = pipelineKey(downstreamProjectId, downstream.id());
+                if (seen.contains(key)) {
+                    continue;
+                }
+                if (current.depth() >= maxPipelineDepth || nodes.size() >= maxPipelines) {
+                    truncated = true;
+                    continue;
+                }
+                PipelineNode child = new PipelineNode(
+                        downstreamProjectId,
+                        downstream,
+                        current.depth() + 1);
+                seen.add(key);
+                nodes.add(child);
+                queue.addLast(child);
+            }
+        }
+        return new PipelineGraph(nodes, edges, truncated);
+    }
+
+    private String pipelineKey(String projectId, Long pipelineId) {
+        return projectId + ":" + pipelineId;
     }
 
     private void collectTrace(

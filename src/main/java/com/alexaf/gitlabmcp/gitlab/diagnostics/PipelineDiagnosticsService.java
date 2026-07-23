@@ -177,10 +177,7 @@ public class PipelineDiagnosticsService {
                 .map(this::summary)
                 .toList();
 
-        String warning = context.jobsTruncated()
-                ? "Pipeline job inspection stopped after " + context.totalJobsFetched()
-                        + " jobs because GITLAB_MAX_JOBS was reached."
-                : null;
+        String warning = truncationWarning(context);
         PipelineAnalysis analysis = analysisEngine.analyze(context);
         return new PipelineDiagnosticsResult(
                 pipeline,
@@ -193,7 +190,21 @@ public class PipelineDiagnosticsService {
                 warning,
                 detailsEnabled,
                 analysis.findings(),
-                analysis.analyzers());
+                analysis.analyzers(),
+                context.graph());
+    }
+
+    private String truncationWarning(PipelineContext context) {
+        List<String> warnings = new ArrayList<>();
+        if (context.jobsTruncated()) {
+            warnings.add("Pipeline job inspection stopped after " + context.totalJobsFetched()
+                    + " jobs because GITLAB_MAX_JOBS was reached.");
+        }
+        if (context.graph().truncated()) {
+            warnings.add("Downstream pipeline inspection was limited by GITLAB_MAX_PIPELINES"
+                    + " or GITLAB_MAX_PIPELINE_DEPTH.");
+        }
+        return warnings.isEmpty() ? null : String.join(" ", warnings);
     }
 
     public JobFailureSummary extractJobFailureSummary(
