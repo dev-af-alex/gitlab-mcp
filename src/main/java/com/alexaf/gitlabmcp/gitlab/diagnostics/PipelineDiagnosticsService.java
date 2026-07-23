@@ -1,7 +1,13 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
 import com.alexaf.gitlabmcp.adapter.gitlab.rest.RestGitlabGateway;
+import com.alexaf.gitlabmcp.adapter.analysis.generic.GenericTraceFailureAnalyzer;
+import com.alexaf.gitlabmcp.adapter.analysis.junit.GitlabTestReportAnalyzer;
+import com.alexaf.gitlabmcp.adapter.analysis.junit.JunitXmlFailureAnalyzer;
+import com.alexaf.gitlabmcp.adapter.analysis.maven.MavenTraceFailureAnalyzer;
 import com.alexaf.gitlabmcp.application.pipeline.DefaultPipelineContextCollector;
+import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
+import com.alexaf.gitlabmcp.domain.PipelineAnalysis;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
@@ -16,7 +22,9 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -32,6 +40,7 @@ public class PipelineDiagnosticsService {
 
     private final GitlabApiClient gitlab;
     private final PipelineContextCollector contextCollector;
+    private final PipelineAnalysisEngine analysisEngine;
     private final TraceAnalyzer traceAnalyzer;
     private final MavenFailureAnalyzer mavenFailureAnalyzer;
     private final SurefireReportAnalyzer surefireReportAnalyzer;
@@ -42,6 +51,7 @@ public class PipelineDiagnosticsService {
     public PipelineDiagnosticsService(
             GitlabApiClient gitlab,
             PipelineContextCollector contextCollector,
+            PipelineAnalysisEngine analysisEngine,
             TraceAnalyzer traceAnalyzer,
             MavenFailureAnalyzer mavenFailureAnalyzer,
             SurefireReportAnalyzer surefireReportAnalyzer,
@@ -49,6 +59,7 @@ public class PipelineDiagnosticsService {
             ArtifactHintDetector artifactHintDetector) {
         this.gitlab = gitlab;
         this.contextCollector = contextCollector;
+        this.analysisEngine = analysisEngine;
         this.traceAnalyzer = traceAnalyzer;
         this.mavenFailureAnalyzer = mavenFailureAnalyzer;
         this.surefireReportAnalyzer = surefireReportAnalyzer;
@@ -67,6 +78,11 @@ public class PipelineDiagnosticsService {
         this(
                 gitlab,
                 new DefaultPipelineContextCollector(new RestGitlabGateway(gitlab), 500),
+                new PipelineAnalysisEngine(List.of(
+                        new GitlabTestReportAnalyzer(),
+                        new JunitXmlFailureAnalyzer(),
+                        new MavenTraceFailureAnalyzer(mavenFailureAnalyzer),
+                        new GenericTraceFailureAnalyzer(traceAnalyzer))),
                 traceAnalyzer,
                 mavenFailureAnalyzer,
                 surefireReportAnalyzer,
@@ -142,9 +158,20 @@ public class PipelineDiagnosticsService {
                             ? DEFAULT_MAX_TRACE_BYTES
                             : maxTraceBytesPerJob;
 
+        Map<Long, String> traces = new LinkedHashMap<>();
+        if (tracesEnabled) {
+            jobs.stream()
+                    .filter(job -> "failed".equals(job.status()))
+                    .forEach(job -> traces.put(
+                            job.id(),
+                            gitlab.getTailText(
+                                    "/projects/" + projectPath + "/jobs/" + job.id() + "/trace",
+                                    maxTraceBytes)));
+        }
+        PipelineContext analysisContext = context.withExecutionData(traces, context.junitReports());
         List<JobDiagnostic> failedJobs = jobs.stream()
                 .filter(job -> "failed".equals(job.status()))
-                .map(job -> diagnoseJob(projectPath, job, tracesEnabled, rawTracesEnabled, maxTraceBytes,
+                .map(job -> diagnoseJob(projectPath, job, traces.get(job.id()), rawTracesEnabled,
                         artifactHintsEnabled, detailsEnabled))
                 .toList();
         List<JobSummary> otherNotSuccessfulJobs = jobs.stream()
@@ -156,6 +183,7 @@ public class PipelineDiagnosticsService {
                 ? "Pipeline job inspection stopped after " + context.totalJobsFetched()
                         + " jobs because GITLAB_MAX_JOBS was reached."
                 : null;
+        PipelineAnalysis analysis = analysisEngine.analyze(analysisContext);
         return new PipelineDiagnosticsResult(
                 pipeline,
                 summary(pipeline, failedJobs, otherNotSuccessfulJobs),
@@ -165,7 +193,9 @@ public class PipelineDiagnosticsService {
                 rawTracesEnabled,
                 artifactHintsEnabled,
                 warning,
-                detailsEnabled);
+                detailsEnabled,
+                analysis.findings(),
+                analysis.analyzers());
     }
 
     public JobFailureSummary extractJobFailureSummary(
@@ -251,14 +281,10 @@ public class PipelineDiagnosticsService {
     private JobDiagnostic diagnoseJob(
             String projectPath,
             Job job,
-            boolean includeTrace,
+            String trace,
             boolean includeRawTrace,
-            int maxTraceBytes,
             boolean includeArtifactHints,
             boolean includeDetails) {
-        String trace = includeTrace
-                       ? gitlab.getTailText("/projects/" + projectPath + "/jobs/" + job.id() + "/trace", maxTraceBytes)
-                       : null;
         TraceAnalysis analysis = traceAnalyzer.analyze(job, trace);
         JobFailureSummary failureSummary = failureSummary(projectPath, job, trace, includeDetails);
         RootCauseSummary primaryCause = failureSummary.primaryCause();

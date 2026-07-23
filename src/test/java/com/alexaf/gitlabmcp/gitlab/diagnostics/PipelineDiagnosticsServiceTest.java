@@ -74,6 +74,10 @@ class PipelineDiagnosticsServiceTest {
                 .contains("junit junit.xml xml", "target/surefire-reports/TEST-ServiceTest.xml")
                 .doesNotContain("target/app.jar");
         assertThat(result.otherNotSuccessfulJobs()).extracting(JobSummary::name).containsExactly("deploy");
+        assertThat(result.analyzers()).containsExactly("maven-trace", "generic-trace");
+        assertThat(result.findings())
+                .extracting(finding -> finding.toolchain())
+                .containsExactly("generic");
         assertThat(result.detailsIncluded()).isFalse();
         assertThat(failedJob.failureSummary().importantTraceMatches().matches())
                 .allSatisfy(match -> {
