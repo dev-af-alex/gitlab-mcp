@@ -169,7 +169,7 @@ export SPRING_SSL_BUNDLE_JKS_GITLAB_TRUSTSTORE_PASSWORD=changeit
 The Docker build is self-contained and does not require a prebuilt JAR:
 
 ```bash
-docker build -t gitlab-mcp:local .
+docker build -t gitlab-mcp:latest .
 ```
 
 Build both supported Linux architectures without publishing:
@@ -177,7 +177,7 @@ Build both supported Linux architectures without publishing:
 ```bash
 docker buildx build \
   --platform linux/amd64,linux/arm64 \
-  --tag gitlab-mcp:local \
+  --tag gitlab-mcp:latest \
   .
 ```
 
@@ -188,7 +188,7 @@ docker run --rm -i \
   -e GITLAB_TOKEN \
   -e GITLAB_URL=https://gitlab.com \
   -e GITLAB_ALLOWED_PROJECTS=group/project \
-  gitlab-mcp:local
+  gitlab-mcp:latest
 ```
 
 For a self-hosted GitLab instance using a private certificate authority, place one or more `.crt` files in `certs/`
@@ -204,12 +204,12 @@ docker run --rm -i \
   -e GITLAB_SSL_BUNDLE=gitlab \
   -e SPRING_SSL_BUNDLE_PEM_GITLAB_TRUSTSTORE_CERTIFICATE=file:/run/certs/gitlab-ca.pem \
   -v "$PWD/gitlab-ca.pem:/run/certs/gitlab-ca.pem:ro" \
-  gitlab-mcp:local
+  gitlab-mcp:latest
 ```
 
 ## Docker MCP Toolkit
 
-Build the `gitlab-mcp:local` image first, then store the GitLab token in Docker MCP's secret store:
+Build the `gitlab-mcp:latest` image first, then store the GitLab token in Docker MCP's secret store:
 
 ```bash
 read -rsp "GitLab token: " GITLAB_TOKEN

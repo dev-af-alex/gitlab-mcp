@@ -1,7 +1,7 @@
 {
   "name": "gitlab-mcp",
   "type": "server",
-  "image": "gitlab-mcp:local",
+  "image": "gitlab-mcp:latest",
   "description": "Read-only GitLab MCP server for merge request, pipeline, and CI diagnostics workflows.",
   "title": "GitLab MCP",
   "icon": "https://avatars.githubusercontent.com/u/1086321?s=200&v=4",
