@@ -7,6 +7,8 @@ It is a Java 21 Maven project built with Spring Boot and Spring AI. GitLab 15.1 
 
 ## Working Principles
 
+- Follow `CONTRIBUTING.md` for every repository change, including its branch, commit, pull request, testing, review,
+  and merge requirements.
 - Think before coding: inspect the relevant code, state material assumptions, and surface ambiguous requirements or
   trade-offs.
 - Prefer the smallest solution that satisfies the request. Do not add speculative abstractions, configuration, or
