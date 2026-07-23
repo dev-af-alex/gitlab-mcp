@@ -20,6 +20,8 @@ jobs:
         with:
           fetch-depth: 0
           ref: ${{ github.event.pull_request.head.sha }}
+      - name: Test pull request validator
+        run: node --test .github/scripts/validate-pull-request.test.mjs
       - name: Validate pull request metadata
         env:
           PR_BODY: ${{ github.event.pull_request.body }}

@@ -36,14 +36,14 @@ console.log("Pull request metadata follows CONTRIBUTING.md.");
 function sectionContent(markdown, section) {
     const normalizedMarkdown = markdown.replace(/\r\n?/g, "\n");
     const escapedSection = section.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const match = normalizedMarkdown.match(new RegExp(`^##[ \\t]+${escapedSection}[ \\t]*$`, "im"));
+    const match = normalizedMarkdown.match(new RegExp(`^ {0,3}##[ \\t]+${escapedSection}[ \\t]*$`, "im"));
     if (match === null || match.index === undefined) {
         return "";
     }
 
     const contentStart = match.index + match[0].length;
     const remaining = normalizedMarkdown.slice(contentStart);
-    const nextHeading = remaining.search(/^##[ \t]+/m);
+    const nextHeading = remaining.search(/^ {0,3}##[ \t]+/m);
     const content = nextHeading === -1 ? remaining : remaining.slice(0, nextHeading);
 
     return content.replace(/<!--[\s\S]*?-->/g, "").trim();
