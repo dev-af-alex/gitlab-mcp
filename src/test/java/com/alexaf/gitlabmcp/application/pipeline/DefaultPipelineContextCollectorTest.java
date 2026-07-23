@@ -93,6 +93,7 @@ class DefaultPipelineContextCollectorTest {
         assertThat(context.artifacts()).containsEntry(7L, List.of(junit));
         assertThat(context.junitReports())
                 .containsEntry("7:reports/jest-junit.xml", "<testsuite/>");
+        assertThat(context.buildSignals()).contains("node");
     }
 
     @Test

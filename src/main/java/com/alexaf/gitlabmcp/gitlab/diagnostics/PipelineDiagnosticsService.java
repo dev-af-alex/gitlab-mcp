@@ -191,7 +191,8 @@ public class PipelineDiagnosticsService {
                 detailsEnabled,
                 analysis.findings(),
                 analysis.analyzers(),
-                context.graph());
+                context.graph(),
+                context.buildSignals());
     }
 
     private String truncationWarning(PipelineContext context) {
@@ -312,7 +313,8 @@ public class PipelineDiagnosticsService {
                 : List.of(),
                 includeRawTrace ? trace : null,
                 trace != null && trace.contains("[truncated to "),
-                analysis.nextSteps());
+                analysis.nextSteps(),
+                job.runner());
     }
 
     private List<String> usefulArtifacts(

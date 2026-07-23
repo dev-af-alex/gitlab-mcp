@@ -7,6 +7,7 @@ import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public record PipelineContext(
         Pipeline pipeline,
@@ -17,7 +18,8 @@ public record PipelineContext(
         GitlabTestReport testReport,
         boolean jobsTruncated,
         int totalJobsFetched,
-        PipelineGraph graph
+        PipelineGraph graph,
+        Set<String> buildSignals
 ) {
 
     public PipelineContext {
@@ -29,6 +31,22 @@ public record PipelineContext(
                         Map.Entry::getKey,
                         entry -> List.copyOf(entry.getValue())));
         graph = graph == null ? PipelineGraph.root("", pipeline) : graph;
+        buildSignals = Set.copyOf(buildSignals);
+    }
+
+    public PipelineContext(
+            Pipeline pipeline,
+            List<Job> jobs,
+            Map<Long, String> traces,
+            Map<String, String> junitReports,
+            Map<Long, List<ArtifactFile>> artifacts,
+            GitlabTestReport testReport,
+            boolean jobsTruncated,
+            int totalJobsFetched,
+            PipelineGraph graph
+    ) {
+        this(pipeline, jobs, traces, junitReports, artifacts, testReport,
+                jobsTruncated, totalJobsFetched, graph, Set.of());
     }
 
     public PipelineContext(
@@ -42,7 +60,7 @@ public record PipelineContext(
             int totalJobsFetched
     ) {
         this(pipeline, jobs, traces, junitReports, artifacts, testReport,
-                jobsTruncated, totalJobsFetched, null);
+                jobsTruncated, totalJobsFetched, null, Set.of());
     }
 
     public PipelineContext(
@@ -86,6 +104,7 @@ public record PipelineContext(
                 testReport,
                 jobsTruncated,
                 totalJobsFetched,
-                graph);
+                graph,
+                buildSignals);
     }
 }

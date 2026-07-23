@@ -113,7 +113,50 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
                 testReport.orElse(null),
                 jobsTruncated,
                 totalJobsFetched,
-                graph);
+                graph,
+                detectBuildSignals(jobs, traces, artifacts, junitReports));
+    }
+
+    private Set<String> detectBuildSignals(
+            List<Job> jobs,
+            Map<Long, String> traces,
+            Map<Long, List<ArtifactFile>> artifacts,
+            Map<String, String> junitReports
+    ) {
+        StringBuilder source = new StringBuilder();
+        jobs.forEach(job -> source.append(' ')
+                .append(job.name())
+                .append(' ')
+                .append(job.stage()));
+        traces.values().forEach(trace -> source.append(' ').append(trace));
+        artifacts.values().stream()
+                .flatMap(List::stream)
+                .map(ArtifactFile::path)
+                .forEach(path -> source.append(' ').append(path));
+        junitReports.keySet().forEach(path -> source.append(' ').append(path));
+        String text = source.toString().toLowerCase(Locale.ROOT);
+        Set<String> signals = new java.util.LinkedHashSet<>();
+        addSignal(signals, "maven", text, "mvn ", "pom.xml", "surefire", "failsafe");
+        addSignal(signals, "gradle", text, "gradlew", "build.gradle", "test-results/test");
+        addSignal(signals, "node", text, "npm ", "yarn ", "pnpm ", "jest", "node_modules");
+        addSignal(signals, "python", text, "pytest", "python ", "tox.ini", "junitxml");
+        addSignal(signals, "go", text, "go test", "go.mod");
+        addSignal(signals, "dotnet", text, "dotnet ", ".csproj", "test-results.trx");
+        addSignal(signals, "rust", text, "cargo ", "cargo.toml");
+        addSignal(signals, "docker", text, "docker ", "buildah ", "kaniko", "testcontainers");
+        if (signals.isEmpty()) {
+            signals.add("generic");
+        }
+        return signals;
+    }
+
+    private void addSignal(Set<String> signals, String signal, String source, String... markers) {
+        for (String marker : markers) {
+            if (source.contains(marker)) {
+                signals.add(signal);
+                return;
+            }
+        }
     }
 
     private PipelineGraph collectGraph(String projectId, Pipeline root) {

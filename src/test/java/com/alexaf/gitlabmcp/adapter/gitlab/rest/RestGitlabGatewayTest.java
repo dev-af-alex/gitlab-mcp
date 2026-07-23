@@ -117,7 +117,18 @@ class RestGitlabGatewayTest {
                         "https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/jobs"
                                 + "?include_retried=false&page=2&per_page=30"))
                 .andRespond(withSuccess("""
-                        [{"id": 7, "name": "test", "status": "failed"}]
+                        [{
+                          "id": 7,
+                          "name": "test",
+                          "status": "failed",
+                          "runner": {
+                            "id": 9,
+                            "description": "linux arm64",
+                            "runner_type": "project_type",
+                            "online": true,
+                            "status": "online"
+                          }
+                        }]
                         """, MediaType.APPLICATION_JSON));
 
         var jobs = gateway.listPipelineJobs(
@@ -130,6 +141,8 @@ class RestGitlabGatewayTest {
                 .satisfies(job -> {
                     assertThat(job.id()).isEqualTo(7);
                     assertThat(job.name()).isEqualTo("test");
+                    assertThat(job.runner().description()).isEqualTo("linux arm64");
+                    assertThat(job.runner().runnerType()).isEqualTo("project_type");
                 });
         server.verify();
     }

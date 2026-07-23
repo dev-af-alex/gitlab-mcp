@@ -5,6 +5,7 @@ import com.alexaf.gitlabmcp.domain.PipelineGraph;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 
 import java.util.List;
+import java.util.Set;
 
 public record PipelineDiagnosticsResult(
         Pipeline pipeline,
@@ -18,7 +19,8 @@ public record PipelineDiagnosticsResult(
         boolean detailsIncluded,
         List<Finding> findings,
         List<String> analyzers,
-        PipelineGraph graph
+        PipelineGraph graph,
+        Set<String> buildSignals
 ) {
 
     public PipelineDiagnosticsResult {
@@ -27,6 +29,25 @@ public record PipelineDiagnosticsResult(
         findings = List.copyOf(findings);
         analyzers = List.copyOf(analyzers);
         graph = graph == null ? PipelineGraph.root("", pipeline) : graph;
+        buildSignals = buildSignals == null ? Set.of() : Set.copyOf(buildSignals);
+    }
+
+    public PipelineDiagnosticsResult(
+            Pipeline pipeline,
+            String summary,
+            List<JobDiagnostic> failedJobs,
+            List<JobSummary> otherNotSuccessfulJobs,
+            boolean tracesIncluded,
+            boolean rawTracesIncluded,
+            boolean artifactHintsIncluded,
+            String warning,
+            boolean detailsIncluded,
+            List<Finding> findings,
+            List<String> analyzers,
+            PipelineGraph graph
+    ) {
+        this(pipeline, summary, failedJobs, otherNotSuccessfulJobs, tracesIncluded, rawTracesIncluded,
+                artifactHintsIncluded, warning, detailsIncluded, findings, analyzers, graph, Set.of());
     }
 
     public PipelineDiagnosticsResult(
@@ -43,7 +64,7 @@ public record PipelineDiagnosticsResult(
             List<String> analyzers
     ) {
         this(pipeline, summary, failedJobs, otherNotSuccessfulJobs, tracesIncluded, rawTracesIncluded,
-                artifactHintsIncluded, warning, detailsIncluded, findings, analyzers, null);
+                artifactHintsIncluded, warning, detailsIncluded, findings, analyzers, null, Set.of());
     }
 
     public PipelineDiagnosticsResult(
@@ -58,7 +79,7 @@ public record PipelineDiagnosticsResult(
             boolean detailsIncluded
     ) {
         this(pipeline, summary, failedJobs, otherNotSuccessfulJobs, tracesIncluded, rawTracesIncluded,
-                artifactHintsIncluded, warning, detailsIncluded, List.of(), List.of(), null);
+                artifactHintsIncluded, warning, detailsIncluded, List.of(), List.of(), null, Set.of());
     }
 
     public PipelineDiagnosticsResult(
@@ -71,6 +92,6 @@ public record PipelineDiagnosticsResult(
             boolean artifactHintsIncluded,
             String warning) {
         this(pipeline, summary, failedJobs, otherNotSuccessfulJobs, tracesIncluded, rawTracesIncluded,
-                artifactHintsIncluded, warning, false, List.of(), List.of(), null);
+                artifactHintsIncluded, warning, false, List.of(), List.of(), null, Set.of());
     }
 }
