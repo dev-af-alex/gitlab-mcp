@@ -1,5 +1,6 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
+import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
@@ -246,7 +247,7 @@ class PipelineDiagnosticsServiceTest {
         @Override
         public long pipelineId(String value) {
             pipelineIdInput = value;
-            return pipelineIdReturn;
+            return value.matches("\\d+") ? Long.parseLong(value) : pipelineIdReturn;
         }
 
         @Override
@@ -264,6 +265,18 @@ class PipelineDiagnosticsServiceTest {
         @Override
         public <T> List<T> getList(String path, Class<T> itemType, QueryParam... queryParams) {
             return (List<T>) listResponses.getOrDefault(path, List.of());
+        }
+
+        @SuppressWarnings("unchecked")
+        @Override
+        public <T> GitlabPage<T> getAllPages(
+                String path,
+                Class<T> itemType,
+                int maxItems,
+                QueryParam... queryParams
+        ) {
+            List<T> items = (List<T>) listResponses.getOrDefault(path, List.of());
+            return new GitlabPage<>(items, null, items.size(), false);
         }
 
         @Override

@@ -1,6 +1,7 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
 import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
@@ -145,6 +146,23 @@ public class RestGitlabGateway implements GitlabGateway {
                 gitlab.param("include_retried", includeRetried),
                 gitlab.param("page", page(page)),
                 gitlab.param("per_page", perPage(page)));
+    }
+
+    @Override
+    public GitlabPage<Job> getPipelineJobs(
+            String projectId,
+            String pipelineId,
+            Boolean includeRetried,
+            int maxJobs
+    ) {
+        long id = gitlab.pipelineId(pipelineId);
+        return gitlab.getAllPages(
+                projectApi(projectId) + "/pipelines/" + id + "/jobs",
+                Job.class,
+                maxJobs,
+                gitlab.param("include_retried", includeRetried),
+                gitlab.param("page", 1),
+                gitlab.param("per_page", 100));
     }
 
     @Override

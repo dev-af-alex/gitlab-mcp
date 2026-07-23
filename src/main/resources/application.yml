@@ -24,3 +24,4 @@ gitlab:
   allowed-projects: ${GITLAB_ALLOWED_PROJECTS:}
   default-per-page: ${GITLAB_DEFAULT_PER_PAGE:20}
   max-per-page: ${GITLAB_MAX_PER_PAGE:100}
+  max-jobs: ${GITLAB_MAX_JOBS:500}

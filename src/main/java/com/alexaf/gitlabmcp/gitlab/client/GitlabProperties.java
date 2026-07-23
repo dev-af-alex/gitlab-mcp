@@ -10,6 +10,17 @@ public record GitlabProperties(
         String token,
         List<String> allowedProjects,
         int defaultPerPage,
-        int maxPerPage
+        int maxPerPage,
+        int maxJobs
 ) {
+
+    public GitlabProperties(
+            String url,
+            String token,
+            List<String> allowedProjects,
+            int defaultPerPage,
+            int maxPerPage
+    ) {
+        this(url, token, allowedProjects, defaultPerPage, maxPerPage, 500);
+    }
 }

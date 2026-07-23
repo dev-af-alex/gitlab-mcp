@@ -1,11 +1,16 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.RestGitlabGateway;
+import com.alexaf.gitlabmcp.application.pipeline.DefaultPipelineContextCollector;
+import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.FileChange;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.port.PipelineContextCollector;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -26,11 +31,30 @@ public class PipelineDiagnosticsService {
     private static final int MAX_SUREFIRE_REPORT_BYTES = 128_000;
 
     private final GitlabApiClient gitlab;
+    private final PipelineContextCollector contextCollector;
     private final TraceAnalyzer traceAnalyzer;
     private final MavenFailureAnalyzer mavenFailureAnalyzer;
     private final SurefireReportAnalyzer surefireReportAnalyzer;
     private final LogMatcher logMatcher;
     private final ArtifactHintDetector artifactHintDetector;
+
+    @Autowired
+    public PipelineDiagnosticsService(
+            GitlabApiClient gitlab,
+            PipelineContextCollector contextCollector,
+            TraceAnalyzer traceAnalyzer,
+            MavenFailureAnalyzer mavenFailureAnalyzer,
+            SurefireReportAnalyzer surefireReportAnalyzer,
+            LogMatcher logMatcher,
+            ArtifactHintDetector artifactHintDetector) {
+        this.gitlab = gitlab;
+        this.contextCollector = contextCollector;
+        this.traceAnalyzer = traceAnalyzer;
+        this.mavenFailureAnalyzer = mavenFailureAnalyzer;
+        this.surefireReportAnalyzer = surefireReportAnalyzer;
+        this.logMatcher = logMatcher;
+        this.artifactHintDetector = artifactHintDetector;
+    }
 
     public PipelineDiagnosticsService(
             GitlabApiClient gitlab,
@@ -38,13 +62,16 @@ public class PipelineDiagnosticsService {
             MavenFailureAnalyzer mavenFailureAnalyzer,
             SurefireReportAnalyzer surefireReportAnalyzer,
             LogMatcher logMatcher,
-            ArtifactHintDetector artifactHintDetector) {
-        this.gitlab = gitlab;
-        this.traceAnalyzer = traceAnalyzer;
-        this.mavenFailureAnalyzer = mavenFailureAnalyzer;
-        this.surefireReportAnalyzer = surefireReportAnalyzer;
-        this.logMatcher = logMatcher;
-        this.artifactHintDetector = artifactHintDetector;
+            ArtifactHintDetector artifactHintDetector
+    ) {
+        this(
+                gitlab,
+                new DefaultPipelineContextCollector(new RestGitlabGateway(gitlab), 500),
+                traceAnalyzer,
+                mavenFailureAnalyzer,
+                surefireReportAnalyzer,
+                logMatcher,
+                artifactHintDetector);
     }
 
     private static String simpleName(String className) {
@@ -103,12 +130,9 @@ public class PipelineDiagnosticsService {
             Boolean includeArtifactHints,
             Boolean includeDetails) {
         String projectPath = gitlab.projectPath(projectId);
-        Pipeline pipeline = resolvePipeline(projectPath, pipelineId, mergeRequestIid);
-        List<Job> jobs = gitlab.getList("/projects/" + projectPath + "/pipelines/" + pipeline.id() + "/jobs",
-                Job.class,
-                gitlab.param("include_retried", false),
-                gitlab.param("page", 1),
-                gitlab.param("per_page", 100));
+        PipelineContext context = contextCollector.collect(projectId, pipelineId, mergeRequestIid);
+        Pipeline pipeline = context.pipeline();
+        List<Job> jobs = context.jobs();
 
         boolean tracesEnabled = includeTraces == null || includeTraces;
         boolean rawTracesEnabled = includeRawTraces != null && includeRawTraces;
@@ -128,7 +152,10 @@ public class PipelineDiagnosticsService {
                 .map(this::summary)
                 .toList();
 
-        String warning = jobs.size() == 100 ? "Only the first 100 pipeline jobs were inspected." : null;
+        String warning = context.jobsTruncated()
+                ? "Pipeline job inspection stopped after " + context.totalJobsFetched()
+                        + " jobs because GITLAB_MAX_JOBS was reached."
+                : null;
         return new PipelineDiagnosticsResult(
                 pipeline,
                 summary(pipeline, failedJobs, otherNotSuccessfulJobs),
@@ -219,26 +246,6 @@ public class PipelineDiagnosticsService {
                 changedFiles,
                 likelyRelevantChangedFiles(changedFiles, pipelineDiagnostics.failedJobs()),
                 recommendedNextSteps(pipelineDiagnostics));
-    }
-
-    private Pipeline resolvePipeline(String projectPath, String pipelineId, String mergeRequestIid) {
-        if (StringUtils.hasText(pipelineId)) {
-            long id = gitlab.pipelineId(pipelineId);
-            return gitlab.getObject("/projects/" + projectPath + "/pipelines/" + id, Pipeline.class);
-        }
-        if (StringUtils.hasText(mergeRequestIid)) {
-            long iid = gitlab.mergeRequestIid(mergeRequestIid);
-            List<Pipeline> pipelines = gitlab.getList("/projects/" + projectPath + "/merge_requests/" + iid + "/pipelines",
-                    Pipeline.class,
-                    gitlab.param("page", 1),
-                    gitlab.param("per_page", 20));
-            return pipelines.stream()
-                    .filter(pipeline -> "failed".equals(pipeline.status()) || "canceled".equals(pipeline.status()))
-                    .findFirst()
-                    .or(() -> pipelines.stream().findFirst())
-                    .orElseThrow(() -> new IllegalArgumentException("No pipelines found for merge request: " + mergeRequestIid));
-        }
-        throw new IllegalArgumentException("Either pipelineId or mergeRequestIid must be set");
     }
 
     private JobDiagnostic diagnoseJob(

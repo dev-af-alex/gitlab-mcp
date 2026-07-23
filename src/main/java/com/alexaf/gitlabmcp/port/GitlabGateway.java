@@ -1,6 +1,7 @@
 package com.alexaf.gitlabmcp.port;
 
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
@@ -56,6 +57,13 @@ public interface GitlabGateway {
             String pipelineId,
             Boolean includeRetried,
             GitlabPageRequest page
+    );
+
+    GitlabPage<Job> getPipelineJobs(
+            String projectId,
+            String pipelineId,
+            Boolean includeRetried,
+            int maxJobs
     );
 
     Job getJob(String projectId, String jobId);
