@@ -34,6 +34,6 @@ public class GitlabServerInfoProvider {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    record VersionResponse(String version, String revision) {
+    public record VersionResponse(String version, String revision) {
     }
 }

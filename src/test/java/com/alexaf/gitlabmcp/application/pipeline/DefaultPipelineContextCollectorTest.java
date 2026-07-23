@@ -2,7 +2,9 @@ package com.alexaf.gitlabmcp.application.pipeline;
 
 import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
+import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
@@ -58,6 +60,38 @@ class DefaultPipelineContextCollectorTest {
 
         assertThat(context.pipeline()).isSameAs(failed);
         verify(gitlab).getPipelineJobs("group/repo", "42", false, 2);
+    }
+
+    @Test
+    void collectsFailedJobTraceArtifactsAndJunitReportsWhenRequested() {
+        Pipeline pipeline = pipeline(42L, "failed");
+        Job failedJob = job(7L);
+        ArtifactFile junit = new ArtifactFile(
+                "junit.xml",
+                "reports/jest-junit.xml",
+                "file",
+                128L,
+                "100644");
+        when(gitlab.getPipeline("group/repo", "42")).thenReturn(pipeline);
+        when(gitlab.getPipelineJobs("group/repo", "42", false, 2))
+                .thenReturn(new GitlabPage<>(List.of(failedJob), null, 1, false));
+        when(gitlab.getPipelineTestReport("group/repo", "42")).thenReturn(Optional.empty());
+        when(gitlab.getJobTraceTail("group/repo", "7", 4096)).thenReturn("failed trace");
+        when(gitlab.listJobArtifacts(
+                "group/repo", "7", null, true, new GitlabPageRequest(1, 50)))
+                .thenReturn(List.of(junit));
+        when(gitlab.getJobArtifactFile(
+                "group/repo", "7", "reports/jest-junit.xml", 8192))
+                .thenReturn("<testsuite/>");
+        PipelineCollectionOptions options =
+                new PipelineCollectionOptions(true, 4096, true, 50, 5, 8192);
+
+        var context = collector.collect("group/repo", "42", null, options);
+
+        assertThat(context.traces()).containsEntry(7L, "failed trace");
+        assertThat(context.artifacts()).containsEntry(7L, List.of(junit));
+        assertThat(context.junitReports())
+                .containsEntry("7:reports/jest-junit.xml", "<testsuite/>");
     }
 
     private static Pipeline pipeline(Long id, String status) {

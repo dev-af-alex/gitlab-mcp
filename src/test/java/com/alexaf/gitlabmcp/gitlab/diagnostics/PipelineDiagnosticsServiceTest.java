@@ -1,5 +1,6 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabServerInfoProvider;
 import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
@@ -39,6 +40,9 @@ class PipelineDiagnosticsServiceTest {
     @BeforeEach
     void setUp() {
         gitlab = new RecordingGitlabApiClient();
+        gitlab.objectResponses.put(
+                "/version",
+                new GitlabServerInfoProvider.VersionResponse("15.1.0-ee", "test"));
         service = new PipelineDiagnosticsService(gitlab, new TraceAnalyzer(), new MavenFailureAnalyzer(),
                 new SurefireReportAnalyzer(), new LogMatcher(), new ArtifactHintDetector());
     }
@@ -56,6 +60,15 @@ class PipelineDiagnosticsServiceTest {
         gitlab.artifactFiles.put("/projects/group%2Frepo/jobs/8/artifacts", List.of(
                 new ArtifactFile("TEST-ServiceTest.xml", "target/surefire-reports/TEST-ServiceTest.xml", "file", 123L, "100644"),
                 new ArtifactFile("app.jar", "target/app.jar", "file", 1024L, "100644")));
+        gitlab.textResponses.put(
+                "/projects/group%2Frepo/jobs/8/artifacts/target/surefire-reports/TEST-ServiceTest.xml",
+                """
+                        <testsuite name="ServiceTest">
+                          <testcase classname="ServiceTest" name="works">
+                            <failure message="expected true">AssertionError</failure>
+                          </testcase>
+                        </testsuite>
+                        """);
 
         PipelineDiagnosticsResult result = service.analyze("group/repo", "pipeline-url", null, true, 4096, true, true);
 
@@ -74,10 +87,10 @@ class PipelineDiagnosticsServiceTest {
                 .contains("junit junit.xml xml", "target/surefire-reports/TEST-ServiceTest.xml")
                 .doesNotContain("target/app.jar");
         assertThat(result.otherNotSuccessfulJobs()).extracting(JobSummary::name).containsExactly("deploy");
-        assertThat(result.analyzers()).containsExactly("maven-trace", "generic-trace");
+        assertThat(result.analyzers()).containsExactly("junit-xml", "maven-trace", "generic-trace");
         assertThat(result.findings())
                 .extracting(finding -> finding.toolchain())
-                .containsExactly("generic");
+                .containsExactly("maven", "generic");
         assertThat(result.detailsIncluded()).isFalse();
         assertThat(failedJob.failureSummary().importantTraceMatches().matches())
                 .allSatisfy(match -> {

@@ -8,6 +8,7 @@ import com.alexaf.gitlabmcp.adapter.analysis.maven.MavenTraceFailureAnalyzer;
 import com.alexaf.gitlabmcp.application.pipeline.DefaultPipelineContextCollector;
 import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
 import com.alexaf.gitlabmcp.domain.PipelineAnalysis;
+import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
@@ -22,9 +23,7 @@ import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
-import java.util.LinkedHashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Locale;
 import java.util.Set;
 import java.util.regex.Pattern;
@@ -143,13 +142,9 @@ public class PipelineDiagnosticsService {
             Boolean includeTraces,
             Integer maxTraceBytesPerJob,
             Boolean includeRawTraces,
-            Boolean includeArtifactHints,
-            Boolean includeDetails) {
+        Boolean includeArtifactHints,
+        Boolean includeDetails) {
         String projectPath = gitlab.projectPath(projectId);
-        PipelineContext context = contextCollector.collect(projectId, pipelineId, mergeRequestIid);
-        Pipeline pipeline = context.pipeline();
-        List<Job> jobs = context.jobs();
-
         boolean tracesEnabled = includeTraces == null || includeTraces;
         boolean rawTracesEnabled = includeRawTraces != null && includeRawTraces;
         boolean artifactHintsEnabled = includeArtifactHints == null || includeArtifactHints;
@@ -158,21 +153,30 @@ public class PipelineDiagnosticsService {
                             ? DEFAULT_MAX_TRACE_BYTES
                             : maxTraceBytesPerJob;
 
-        Map<Long, String> traces = new LinkedHashMap<>();
-        if (tracesEnabled) {
-            jobs.stream()
-                    .filter(job -> "failed".equals(job.status()))
-                    .forEach(job -> traces.put(
-                            job.id(),
-                            gitlab.getTailText(
-                                    "/projects/" + projectPath + "/jobs/" + job.id() + "/trace",
-                                    maxTraceBytes)));
-        }
-        PipelineContext analysisContext = context.withExecutionData(traces, context.junitReports());
+        PipelineCollectionOptions collectionOptions = new PipelineCollectionOptions(
+                tracesEnabled,
+                maxTraceBytes,
+                artifactHintsEnabled,
+                100,
+                MAX_SUREFIRE_REPORTS,
+                MAX_SUREFIRE_REPORT_BYTES);
+        PipelineContext context = contextCollector.collect(
+                projectId,
+                pipelineId,
+                mergeRequestIid,
+                collectionOptions);
+        Pipeline pipeline = context.pipeline();
+        List<Job> jobs = context.jobs();
         List<JobDiagnostic> failedJobs = jobs.stream()
                 .filter(job -> "failed".equals(job.status()))
-                .map(job -> diagnoseJob(projectPath, job, traces.get(job.id()), rawTracesEnabled,
-                        artifactHintsEnabled, detailsEnabled))
+                .map(job -> diagnoseJob(
+                        projectPath,
+                        job,
+                        context.traces().get(job.id()),
+                        context.artifacts().get(job.id()),
+                        rawTracesEnabled,
+                        artifactHintsEnabled,
+                        detailsEnabled))
                 .toList();
         List<JobSummary> otherNotSuccessfulJobs = jobs.stream()
                 .filter(job -> !"success".equals(job.status()) && !"failed".equals(job.status()))
@@ -183,7 +187,7 @@ public class PipelineDiagnosticsService {
                 ? "Pipeline job inspection stopped after " + context.totalJobsFetched()
                         + " jobs because GITLAB_MAX_JOBS was reached."
                 : null;
-        PipelineAnalysis analysis = analysisEngine.analyze(analysisContext);
+        PipelineAnalysis analysis = analysisEngine.analyze(context);
         return new PipelineDiagnosticsResult(
                 pipeline,
                 summary(pipeline, failedJobs, otherNotSuccessfulJobs),
@@ -282,6 +286,7 @@ public class PipelineDiagnosticsService {
             String projectPath,
             Job job,
             String trace,
+            List<ArtifactFile> knownArtifacts,
             boolean includeRawTrace,
             boolean includeArtifactHints,
             boolean includeDetails) {
@@ -301,14 +306,25 @@ public class PipelineDiagnosticsService {
                 includeDetails ? analysis.evidence() : compactLines(analysis.evidence(), 6),
                 failureSummary,
                 includeArtifactHints
-                ? (includeDetails ? usefulArtifacts(projectPath, job) : usefulArtifacts(projectPath, job).stream().limit(10).toList())
+                ? (includeDetails
+                ? usefulArtifacts(projectPath, job, knownArtifacts)
+                : usefulArtifacts(projectPath, job, knownArtifacts).stream().limit(10).toList())
                 : List.of(),
                 includeRawTrace ? trace : null,
                 trace != null && trace.contains("[truncated to "),
                 analysis.nextSteps());
     }
 
-    private List<String> usefulArtifacts(String projectPath, Job job) {
+    private List<String> usefulArtifacts(
+            String projectPath,
+            Job job,
+            List<ArtifactFile> knownArtifacts
+    ) {
+        if (knownArtifacts != null) {
+            return artifactHintDetector.usefulArtifacts(job, knownArtifacts).stream()
+                    .limit(MAX_USEFUL_ARTIFACTS)
+                    .toList();
+        }
         List<ArtifactFile> artifactFiles ;
         try {
             artifactFiles = gitlab.listArtifactArchive(
