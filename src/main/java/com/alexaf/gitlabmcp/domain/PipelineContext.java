@@ -19,7 +19,8 @@ public record PipelineContext(
         boolean jobsTruncated,
         int totalJobsFetched,
         PipelineGraph graph,
-        Set<String> buildSignals
+        Set<String> buildSignals,
+        List<String> warnings
 ) {
 
     public PipelineContext {
@@ -32,6 +33,23 @@ public record PipelineContext(
                         entry -> List.copyOf(entry.getValue())));
         graph = graph == null ? PipelineGraph.root("", pipeline) : graph;
         buildSignals = Set.copyOf(buildSignals);
+        warnings = warnings == null ? List.of() : List.copyOf(warnings);
+    }
+
+    public PipelineContext(
+            Pipeline pipeline,
+            List<Job> jobs,
+            Map<Long, String> traces,
+            Map<String, String> junitReports,
+            Map<Long, List<ArtifactFile>> artifacts,
+            GitlabTestReport testReport,
+            boolean jobsTruncated,
+            int totalJobsFetched,
+            PipelineGraph graph,
+            Set<String> buildSignals
+    ) {
+        this(pipeline, jobs, traces, junitReports, artifacts, testReport,
+                jobsTruncated, totalJobsFetched, graph, buildSignals, List.of());
     }
 
     public PipelineContext(
@@ -46,7 +64,7 @@ public record PipelineContext(
             PipelineGraph graph
     ) {
         this(pipeline, jobs, traces, junitReports, artifacts, testReport,
-                jobsTruncated, totalJobsFetched, graph, Set.of());
+                jobsTruncated, totalJobsFetched, graph, Set.of(), List.of());
     }
 
     public PipelineContext(
@@ -105,6 +123,7 @@ public record PipelineContext(
                 jobsTruncated,
                 totalJobsFetched,
                 graph,
-                buildSignals);
+                buildSignals,
+                warnings);
     }
 }

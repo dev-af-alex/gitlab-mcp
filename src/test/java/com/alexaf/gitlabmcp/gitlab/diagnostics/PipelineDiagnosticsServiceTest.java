@@ -11,6 +11,7 @@ import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
 import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.JobArtifact;
@@ -20,6 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.web.client.RestClient;
 
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -228,6 +230,47 @@ class PipelineDiagnosticsServiceTest {
     }
 
     @Test
+    void skipsOversizedArtifactLogAndKeepsTraceDiagnostics() {
+        Job failedJob = job(8L, "tests", "failed", "script_failure");
+        gitlab.pipelineIdReturn = 123L;
+        gitlab.objectResponses.put("/projects/group%2Frepo/pipelines/123", pipeline(123L, "failed"));
+        gitlab.objectResponses.put("/projects/group%2Frepo/jobs/8", failedJob);
+        gitlab.listResponses.put("/projects/group%2Frepo/pipelines/123/jobs", List.of(failedJob));
+        gitlab.textResponses.put("/projects/group%2Frepo/jobs/8/trace", """
+                mvn test
+                [ERROR] Tests run: 10, Failures: 1, Errors: 0, Skipped: 0
+                [INFO] BUILD FAILURE
+                """);
+        String archive = "/projects/group%2Frepo/jobs/8/artifacts";
+        String artifactLog = archive + "/build.log";
+        gitlab.artifactFiles.put(archive + ":.*\\.log$", List.of(new ArtifactFile(
+                "build.log", "build.log", "file", 150_000_000L, "100644")));
+        gitlab.tailFailures.put(artifactLog, new GitlabDownloadLimitException(
+                URI.create("https://gitlab.example" + artifactLog),
+                100_000_000L));
+
+        PipelineDiagnosticsResult pipelineResult = service.analyze(
+                "group/repo", "pipeline-url", null, true, 4096, false, false);
+        JobFailureSummary jobResult = service.extractJobFailureSummary(
+                "group/repo", "8", 4096, false);
+
+        assertThat(pipelineResult.failedJobs()).singleElement()
+                .satisfies(diagnostic -> {
+                    assertThat(diagnostic.failureSummary().maven().testFailureDetected()).isTrue();
+                    assertThat(diagnostic.failureSummary().warnings()).containsExactly(
+                            "Skipped artifact log build.log because it exceeds "
+                                    + "the configured download limit of 100000000 bytes.");
+                });
+        assertThat(pipelineResult.warning())
+                .contains("Skipped artifact log build.log")
+                .contains("100000000 bytes");
+        assertThat(jobResult.maven().testFailureDetected()).isTrue();
+        assertThat(jobResult.warnings()).containsExactly(
+                "Skipped artifact log build.log because it exceeds "
+                        + "the configured download limit of 100000000 bytes.");
+    }
+
+    @Test
     void compactSummaryGroupsApplicationContextCascades() {
         gitlab.pipelineIdReturn = 123L;
         gitlab.objectResponses.put("/projects/group%2Frepo/pipelines/123", pipeline(123L, "failed"));
@@ -264,6 +307,7 @@ class PipelineDiagnosticsServiceTest {
         private final Map<String, List<?>> listResponses = new HashMap<>();
         private final Map<String, List<ArtifactFile>> artifactFiles = new HashMap<>();
         private final Map<String, String> textResponses = new HashMap<>();
+        private final Map<String, RuntimeException> tailFailures = new HashMap<>();
         private final List<String> tailCalls = new ArrayList<>();
         private String projectIdInput;
         private long pipelineIdReturn = 1L;
@@ -320,6 +364,10 @@ class PipelineDiagnosticsServiceTest {
         @Override
         public String getTailText(String path, Integer maxBytes, QueryParam... queryParams) {
             tailCalls.add(path + ":" + maxBytes);
+            RuntimeException failure = tailFailures.get(path);
+            if (failure != null) {
+                throw failure;
+            }
             return textResponses.get(path);
         }
 

@@ -8,6 +8,7 @@ import com.alexaf.gitlabmcp.domain.PipelineEdge;
 import com.alexaf.gitlabmcp.domain.PipelineGraph;
 import com.alexaf.gitlabmcp.domain.PipelineNode;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
@@ -98,13 +99,14 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
         Map<Long, String> traces = new LinkedHashMap<>();
         Map<Long, List<ArtifactFile>> artifacts = new LinkedHashMap<>();
         Map<String, String> junitReports = new LinkedHashMap<>();
+        List<String> warnings = new ArrayList<>();
         for (Job job : jobs) {
             if (!"failed".equals(job.status())) {
                 continue;
             }
             String jobProjectId = jobProjects.getOrDefault(job.id(), projectId);
-            collectTrace(jobProjectId, job, options, traces);
-            collectArtifacts(jobProjectId, job, options, artifacts, junitReports);
+            collectTrace(jobProjectId, job, options, traces, warnings);
+            collectArtifacts(jobProjectId, job, options, artifacts, junitReports, warnings);
         }
         return new PipelineContext(
                 pipeline,
@@ -116,7 +118,8 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
                 jobsTruncated,
                 totalJobsFetched,
                 graph,
-                detectBuildSignals(jobs, traces, artifacts, junitReports));
+                detectBuildSignals(jobs, traces, artifacts, junitReports),
+                warnings);
     }
 
     private Set<String> detectBuildSignals(
@@ -230,15 +233,20 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             String projectId,
             Job job,
             PipelineCollectionOptions options,
-            Map<Long, String> traces
+            Map<Long, String> traces,
+            List<String> warnings
     ) {
         if (!options.includeTraces()) {
             return;
         }
-        traces.put(job.id(), gitlab.getJobTraceTail(
-                projectId,
-                String.valueOf(job.id()),
-                Math.max(1, options.maxTraceBytes())));
+        try {
+            traces.put(job.id(), gitlab.getJobTraceTail(
+                    projectId,
+                    String.valueOf(job.id()),
+                    Math.max(1, options.maxTraceBytes())));
+        } catch (GitlabDownloadLimitException tooLarge) {
+            addDownloadWarning(warnings, "job " + job.id() + " trace", tooLarge);
+        }
     }
 
     private void collectArtifacts(
@@ -246,7 +254,8 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             Job job,
             PipelineCollectionOptions options,
             Map<Long, List<ArtifactFile>> artifacts,
-            Map<String, String> junitReports
+            Map<String, String> junitReports,
+            List<String> warnings
     ) {
         if (!options.includeArtifacts()) {
             return;
@@ -261,6 +270,9 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
                     new GitlabPageRequest(1, Math.max(1, options.maxArtifactFilesPerJob())));
         } catch (GitlabNotFoundException noArtifacts) {
             return;
+        } catch (GitlabDownloadLimitException tooLarge) {
+            addDownloadWarning(warnings, "job " + job.id() + " artifact archive", tooLarge);
+            return;
         }
         artifacts.put(job.id(), files);
         for (ArtifactFile file : files) {
@@ -268,14 +280,32 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
                     || !isJunitReport(file.path())) {
                 continue;
             }
-            String content = gitlab.getJobArtifactFile(
-                    projectId,
-                    String.valueOf(job.id()),
-                    file.path(),
-                    Math.max(1, options.maxReportBytes()));
+            String content;
+            try {
+                content = gitlab.getJobArtifactFile(
+                        projectId,
+                        String.valueOf(job.id()),
+                        file.path(),
+                        Math.max(1, options.maxReportBytes()));
+            } catch (GitlabDownloadLimitException tooLarge) {
+                addDownloadWarning(warnings, "artifact report " + file.path(), tooLarge);
+                continue;
+            }
             if (StringUtils.hasText(content)) {
                 junitReports.put(job.id() + ":" + file.path(), content);
             }
+        }
+    }
+
+    private void addDownloadWarning(
+            List<String> warnings,
+            String evidence,
+            GitlabDownloadLimitException exception
+    ) {
+        String warning = "Skipped " + evidence + " because it exceeds the configured download limit of "
+                + exception.maxBytes() + " bytes.";
+        if (!warnings.contains(warning)) {
+            warnings.add(warning);
         }
     }
 

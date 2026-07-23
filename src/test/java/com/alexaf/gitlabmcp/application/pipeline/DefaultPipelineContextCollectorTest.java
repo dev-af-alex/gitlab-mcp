@@ -3,6 +3,7 @@ package com.alexaf.gitlabmcp.application.pipeline;
 import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
@@ -11,6 +12,7 @@ import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.junit.jupiter.api.Test;
 
+import java.net.URI;
 import java.util.List;
 import java.util.Optional;
 
@@ -94,6 +96,41 @@ class DefaultPipelineContextCollectorTest {
         assertThat(context.junitReports())
                 .containsEntry("7:reports/jest-junit.xml", "<testsuite/>");
         assertThat(context.buildSignals()).contains("node");
+    }
+
+    @Test
+    void skipsOversizedJunitReportAndRecordsWarning() {
+        Pipeline pipeline = pipeline(42L, "failed");
+        Job failedJob = job(7L);
+        ArtifactFile junit = new ArtifactFile(
+                "junit.xml",
+                "reports/junit.xml",
+                "file",
+                150_000_000L,
+                "100644");
+        when(gitlab.getPipeline("group/repo", "42")).thenReturn(pipeline);
+        when(gitlab.getPipelineJobs("group/repo", "42", false, 2))
+                .thenReturn(new GitlabPage<>(List.of(failedJob), null, 1, false));
+        when(gitlab.getPipelineTestReport("group/repo", "42")).thenReturn(Optional.empty());
+        when(gitlab.getJobTraceTail("group/repo", "7", 4096)).thenReturn("failed trace");
+        when(gitlab.listJobArtifacts(
+                "group/repo", "7", null, true, new GitlabPageRequest(1, 50)))
+                .thenReturn(List.of(junit));
+        when(gitlab.getJobArtifactFile(
+                "group/repo", "7", "reports/junit.xml", 8192))
+                .thenThrow(new GitlabDownloadLimitException(
+                        URI.create("https://gitlab.example/artifacts/reports/junit.xml"),
+                        100_000_000L));
+        PipelineCollectionOptions options =
+                new PipelineCollectionOptions(true, 4096, true, 50, 5, 8192);
+
+        var context = collector.collect("group/repo", "42", null, options);
+
+        assertThat(context.artifacts()).containsEntry(7L, List.of(junit));
+        assertThat(context.junitReports()).isEmpty();
+        assertThat(context.warnings()).containsExactly(
+                "Skipped artifact report reports/junit.xml because it exceeds "
+                        + "the configured download limit of 100000000 bytes.");
     }
 
     @Test

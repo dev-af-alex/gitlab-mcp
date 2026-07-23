@@ -5,6 +5,7 @@ import com.alexaf.gitlabmcp.domain.PipelineAnalysis;
 import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.FileChange;
@@ -147,7 +148,7 @@ public class PipelineDiagnosticsService {
                 .map(this::summary)
                 .toList();
 
-        String warning = truncationWarning(context);
+        String warning = diagnosticWarning(context, failedJobs);
         PipelineAnalysis analysis = analysisEngine.analyze(context);
         return new PipelineDiagnosticsResult(
                 pipeline,
@@ -165,8 +166,8 @@ public class PipelineDiagnosticsService {
                 context.buildSignals());
     }
 
-    private String truncationWarning(PipelineContext context) {
-        List<String> warnings = new ArrayList<>();
+    private String diagnosticWarning(PipelineContext context, List<JobDiagnostic> failedJobs) {
+        List<String> warnings = new ArrayList<>(context.warnings());
         if (context.jobsTruncated()) {
             warnings.add("Pipeline job inspection stopped after " + context.totalJobsFetched()
                     + " jobs because GITLAB_MAX_JOBS was reached.");
@@ -175,7 +176,12 @@ public class PipelineDiagnosticsService {
             warnings.add("Downstream pipeline inspection was limited by GITLAB_MAX_PIPELINES"
                     + " or GITLAB_MAX_PIPELINE_DEPTH.");
         }
-        return warnings.isEmpty() ? null : String.join(" ", warnings);
+        failedJobs.stream()
+                .flatMap(job -> job.failureSummary().warnings().stream())
+                .forEach(warnings::add);
+        return warnings.isEmpty()
+                ? null
+                : warnings.stream().distinct().collect(java.util.stream.Collectors.joining(" "));
     }
 
     public JobFailureSummary extractJobFailureSummary(
@@ -184,11 +190,23 @@ public class PipelineDiagnosticsService {
             Integer maxTraceBytes,
             Boolean includeDetails) {
         Job job = gitlab.getJob(projectId, jobId);
-        String trace = gitlab.getJobTraceTail(
+        List<String> warnings = new ArrayList<>();
+        String trace;
+        try {
+            trace = gitlab.getJobTraceTail(
+                    projectId,
+                    jobId,
+                    maxTraceBytes == null || maxTraceBytes <= 0 ? DEFAULT_MAX_TRACE_BYTES : maxTraceBytes);
+        } catch (GitlabDownloadLimitException tooLarge) {
+            addDownloadWarning(warnings, "job " + jobId + " trace", tooLarge);
+            trace = null;
+        }
+        return failureSummary(
                 projectId,
-                jobId,
-                maxTraceBytes == null || maxTraceBytes <= 0 ? DEFAULT_MAX_TRACE_BYTES : maxTraceBytes);
-        return failureSummary(projectId, job, trace, includeDetails != null && includeDetails);
+                job,
+                trace,
+                includeDetails != null && includeDetails,
+                warnings);
     }
 
     public List<SurefireReportInsight> analyzeJobSurefireReports(
@@ -197,14 +215,17 @@ public class PipelineDiagnosticsService {
             String classNamePattern,
             Integer maxReports) {
         int reportLimit = maxReports == null || maxReports <= 0 ? MAX_SUREFIRE_REPORTS : Math.min(maxReports, 20);
+        List<String> warnings = new ArrayList<>();
         if (StringUtils.hasText(classNamePattern)) {
             String classPattern = Pattern.quote(classNamePattern.trim());
             return analyzeSurefireReports(projectId, jobId, List.of(
                     ".*" + classPattern + ".*\\.txt$",
-                    ".*TEST-.*" + classPattern + ".*\\.xml$"), reportLimit);
+                    ".*TEST-.*" + classPattern + ".*\\.xml$"), reportLimit, warnings);
         }
         return analyzeSurefireReports(projectId, jobId,
-                surefireReportPatterns(artifactMavenSummary(projectId, jobId)), reportLimit);
+                surefireReportPatterns(artifactMavenSummary(projectId, jobId, warnings)),
+                reportLimit,
+                warnings);
     }
 
     public LogMatchResult traceMatches(
@@ -307,6 +328,8 @@ public class PipelineDiagnosticsService {
                     new GitlabPageRequest(1, 100));
         } catch (GitlabNotFoundException ignored) {
             return artifactHintDetector.usefulArtifacts(job, List.of());
+        } catch (GitlabDownloadLimitException ignored) {
+            return artifactHintDetector.usefulArtifacts(job, List.of());
         }
         return artifactHintDetector.usefulArtifacts(job, artifactFiles).stream()
                 .limit(MAX_USEFUL_ARTIFACTS)
@@ -314,11 +337,23 @@ public class PipelineDiagnosticsService {
     }
 
     private JobFailureSummary failureSummary(String projectId, Job job, String trace, boolean includeDetails) {
+        return failureSummary(projectId, job, trace, includeDetails, new ArrayList<>());
+    }
+
+    private JobFailureSummary failureSummary(
+            String projectId,
+            Job job,
+            String trace,
+            boolean includeDetails,
+            List<String> warnings
+    ) {
         MavenFailureSummary maven = mavenFailureAnalyzer.analyze(trace);
-        maven = mavenFailureAnalyzer.merge(maven, artifactMavenSummary(projectId, String.valueOf(job.id())));
+        maven = mavenFailureAnalyzer.merge(
+                maven,
+                artifactMavenSummary(projectId, String.valueOf(job.id()), warnings));
         List<SurefireReportInsight> surefireReports = maven.testFailureDetected()
                                                       ? analyzeSurefireReports(projectId, String.valueOf(job.id()),
-                surefireReportPatterns(maven), MAX_SUREFIRE_REPORTS)
+                surefireReportPatterns(maven), MAX_SUREFIRE_REPORTS, warnings)
                                                       : List.of();
         LogMatchResult importantTraceMatches = logMatcher.importantMatches(trace);
         RootCauseSummary primaryCause = primaryCause(maven, surefireReports, importantTraceMatches);
@@ -332,7 +367,8 @@ public class PipelineDiagnosticsService {
                 importantTraceMatches,
                 primaryCause,
                 surefireReports,
-                contextCascadeClasses(maven, surefireReports));
+                contextCascadeClasses(maven, surefireReports),
+                warnings);
         return includeDetails ? result : compactFailureSummary(result);
     }
 
@@ -354,7 +390,8 @@ public class PipelineDiagnosticsService {
                 summary.importantTraceMatches().compact(),
                 summary.primaryCause() == null ? null : summary.primaryCause().compact(),
                 reports,
-                summary.contextCascadeClasses());
+                summary.contextCascadeClasses(),
+                summary.warnings());
     }
 
     private List<String> contextCascadeClasses(
@@ -444,7 +481,8 @@ public class PipelineDiagnosticsService {
             String projectId,
             String jobId,
             List<String> patterns,
-            int maxReports) {
+            int maxReports,
+            List<String> warnings) {
         List<SurefireReportInsight> result = new ArrayList<>();
         Set<String> seenPaths = new LinkedHashSet<>();
         Set<String> seenReportClasses = new LinkedHashSet<>();
@@ -462,6 +500,9 @@ public class PipelineDiagnosticsService {
                         new GitlabPageRequest(1, maxReports));
             } catch (GitlabNotFoundException ignored) {
                 continue;
+            } catch (GitlabDownloadLimitException tooLarge) {
+                addDownloadWarning(warnings, "job " + jobId + " artifact archive", tooLarge);
+                continue;
             }
             for (ArtifactFile file : files) {
                 if (result.size() >= maxReports
@@ -469,11 +510,17 @@ public class PipelineDiagnosticsService {
                         || !seenReportClasses.add(reportClassKey(file.path()))) {
                     continue;
                 }
-                String text = gitlab.getJobArtifactFile(
-                        projectId,
-                        jobId,
-                        file.path(),
-                        MAX_SUREFIRE_REPORT_BYTES);
+                String text;
+                try {
+                    text = gitlab.getJobArtifactFile(
+                            projectId,
+                            jobId,
+                            file.path(),
+                            MAX_SUREFIRE_REPORT_BYTES);
+                } catch (GitlabDownloadLimitException tooLarge) {
+                    addDownloadWarning(warnings, "Surefire report " + file.path(), tooLarge);
+                    continue;
+                }
                 result.add(surefireReportAnalyzer.analyze(file.path(), text));
             }
         }
@@ -612,7 +659,11 @@ public class PipelineDiagnosticsService {
         return result;
     }
 
-    private MavenFailureSummary artifactMavenSummary(String projectId, String jobId) {
+    private MavenFailureSummary artifactMavenSummary(
+            String projectId,
+            String jobId,
+            List<String> warnings
+    ) {
         try {
             List<ArtifactFile> logs = gitlab.findJobArtifactFiles(
                     projectId,
@@ -622,11 +673,17 @@ public class PipelineDiagnosticsService {
                     new GitlabPageRequest(1, 3));
             MavenFailureSummary result = null;
             for (ArtifactFile log : logs) {
-                String text = gitlab.getJobArtifactFileTail(
-                        projectId,
-                        jobId,
-                        log.path(),
-                        DEFAULT_MAX_TRACE_BYTES);
+                String text;
+                try {
+                    text = gitlab.getJobArtifactFileTail(
+                            projectId,
+                            jobId,
+                            log.path(),
+                            DEFAULT_MAX_TRACE_BYTES);
+                } catch (GitlabDownloadLimitException tooLarge) {
+                    addDownloadWarning(warnings, "artifact log " + log.path(), tooLarge);
+                    continue;
+                }
                 result = mavenFailureAnalyzer.merge(result, mavenFailureAnalyzer.analyze(text));
             }
             return result == null
@@ -634,6 +691,21 @@ public class PipelineDiagnosticsService {
                    : result;
         } catch (GitlabNotFoundException ignored) {
             return noArtifactLog();
+        } catch (GitlabDownloadLimitException tooLarge) {
+            addDownloadWarning(warnings, "job " + jobId + " artifact archive", tooLarge);
+            return noArtifactLog();
+        }
+    }
+
+    private void addDownloadWarning(
+            List<String> warnings,
+            String evidence,
+            GitlabDownloadLimitException exception
+    ) {
+        String warning = "Skipped " + evidence + " because it exceeds the configured download limit of "
+                + exception.maxBytes() + " bytes.";
+        if (!warnings.contains(warning)) {
+            warnings.add(warning);
         }
     }
 
