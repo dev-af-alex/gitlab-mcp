@@ -10,13 +10,16 @@ import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
 import com.alexaf.gitlabmcp.domain.PipelineAnalysis;
 import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.FileChange;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.port.PipelineContextCollector;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -37,7 +40,7 @@ public class PipelineDiagnosticsService {
     private static final int MAX_SUREFIRE_REPORTS = 20;
     private static final int MAX_SUREFIRE_REPORT_BYTES = 128_000;
 
-    private final GitlabApiClient gitlab;
+    private final GitlabGateway gitlab;
     private final PipelineContextCollector contextCollector;
     private final PipelineAnalysisEngine analysisEngine;
     private final TraceAnalyzer traceAnalyzer;
@@ -48,7 +51,7 @@ public class PipelineDiagnosticsService {
 
     @Autowired
     public PipelineDiagnosticsService(
-            GitlabApiClient gitlab,
+            GitlabGateway gitlab,
             PipelineContextCollector contextCollector,
             PipelineAnalysisEngine analysisEngine,
             TraceAnalyzer traceAnalyzer,
@@ -75,7 +78,7 @@ public class PipelineDiagnosticsService {
             ArtifactHintDetector artifactHintDetector
     ) {
         this(
-                gitlab,
+                new RestGitlabGateway(gitlab),
                 new DefaultPipelineContextCollector(new RestGitlabGateway(gitlab), 500),
                 new PipelineAnalysisEngine(List.of(
                         new GitlabTestReportAnalyzer(),
@@ -108,14 +111,6 @@ public class PipelineDiagnosticsService {
         return name;
     }
 
-    private static String artifactPath(String artifactPath) {
-        String result = artifactPath;
-        while (result.startsWith("/")) {
-            result = result.substring(1);
-        }
-        return result;
-    }
-
     private static String packagePath(String className) {
         if (!StringUtils.hasText(className) || !className.contains(".")) {
             return "";
@@ -144,7 +139,6 @@ public class PipelineDiagnosticsService {
             Boolean includeRawTraces,
         Boolean includeArtifactHints,
         Boolean includeDetails) {
-        String projectPath = gitlab.projectPath(projectId);
         boolean tracesEnabled = includeTraces == null || includeTraces;
         boolean rawTracesEnabled = includeRawTraces != null && includeRawTraces;
         boolean artifactHintsEnabled = includeArtifactHints == null || includeArtifactHints;
@@ -161,16 +155,16 @@ public class PipelineDiagnosticsService {
                 MAX_SUREFIRE_REPORTS,
                 MAX_SUREFIRE_REPORT_BYTES);
         PipelineContext context = contextCollector.collect(
-                projectId,
-                pipelineId,
-                mergeRequestIid,
+                        projectId,
+                        pipelineId,
+                        mergeRequestIid,
                 collectionOptions);
         Pipeline pipeline = context.pipeline();
         List<Job> jobs = context.jobs();
         List<JobDiagnostic> failedJobs = jobs.stream()
                 .filter(job -> "failed".equals(job.status()))
                 .map(job -> diagnoseJob(
-                        projectPath,
+                        projectId,
                         job,
                         context.traces().get(job.id()),
                         context.artifacts().get(job.id()),
@@ -207,12 +201,12 @@ public class PipelineDiagnosticsService {
             String jobId,
             Integer maxTraceBytes,
             Boolean includeDetails) {
-        String projectPath = gitlab.projectPath(projectId);
-        long id = gitlab.jobId(jobId);
-        Job job = gitlab.getObject("/projects/" + projectPath + "/jobs/" + id, Job.class);
-        String trace = gitlab.getTailText("/projects/" + projectPath + "/jobs/" + id + "/trace",
+        Job job = gitlab.getJob(projectId, jobId);
+        String trace = gitlab.getJobTraceTail(
+                projectId,
+                jobId,
                 maxTraceBytes == null || maxTraceBytes <= 0 ? DEFAULT_MAX_TRACE_BYTES : maxTraceBytes);
-        return failureSummary(projectPath, job, trace, includeDetails != null && includeDetails);
+        return failureSummary(projectId, job, trace, includeDetails != null && includeDetails);
     }
 
     public List<SurefireReportInsight> analyzeJobSurefireReports(
@@ -220,17 +214,15 @@ public class PipelineDiagnosticsService {
             String jobId,
             String classNamePattern,
             Integer maxReports) {
-        String projectPath = gitlab.projectPath(projectId);
-        long id = gitlab.jobId(jobId);
         int reportLimit = maxReports == null || maxReports <= 0 ? MAX_SUREFIRE_REPORTS : Math.min(maxReports, 20);
         if (StringUtils.hasText(classNamePattern)) {
             String classPattern = Pattern.quote(classNamePattern.trim());
-            return analyzeSurefireReports(projectPath, id, List.of(
+            return analyzeSurefireReports(projectId, jobId, List.of(
                     ".*" + classPattern + ".*\\.txt$",
                     ".*TEST-.*" + classPattern + ".*\\.xml$"), reportLimit);
         }
-        return analyzeSurefireReports(projectPath, id,
-                surefireReportPatterns(artifactMavenSummary(projectPath, id)), reportLimit);
+        return analyzeSurefireReports(projectId, jobId,
+                surefireReportPatterns(artifactMavenSummary(projectId, jobId)), reportLimit);
     }
 
     public LogMatchResult traceMatches(
@@ -242,9 +234,9 @@ public class PipelineDiagnosticsService {
             Integer contextAfter,
             Integer maxMatches,
             Integer maxTraceBytes) {
-        String projectPath = gitlab.projectPath(projectId);
-        long id = gitlab.jobId(jobId);
-        String trace = gitlab.getTailText("/projects/" + projectPath + "/jobs/" + id + "/trace",
+        String trace = gitlab.getJobTraceTail(
+                projectId,
+                jobId,
                 maxTraceBytes == null || maxTraceBytes <= 0 ? DEFAULT_MAX_TRACE_BYTES : maxTraceBytes);
         return logMatcher.findMatches(trace, pattern, regex, contextBefore, contextAfter, maxMatches);
     }
@@ -264,10 +256,7 @@ public class PipelineDiagnosticsService {
                 includeRawTraces,
                 true,
                 includeDetails);
-        String projectPath = gitlab.projectPath(projectId);
-        long iid = gitlab.mergeRequestIid(mergeRequestIid);
-        MergeRequestChanges changes = gitlab.getObject("/projects/" + projectPath + "/merge_requests/" + iid + "/changes",
-                MergeRequestChanges.class);
+        MergeRequestChanges changes = gitlab.getMergeRequestChanges(projectId, mergeRequestIid);
         List<String> changedFiles = changes.changes() == null
                                     ? List.of()
                                     : changes.changes().stream().map(change -> change.newPath() != null ? change.newPath() : change.oldPath()).toList();
@@ -283,7 +272,7 @@ public class PipelineDiagnosticsService {
     }
 
     private JobDiagnostic diagnoseJob(
-            String projectPath,
+            String projectId,
             Job job,
             String trace,
             List<ArtifactFile> knownArtifacts,
@@ -291,7 +280,7 @@ public class PipelineDiagnosticsService {
             boolean includeArtifactHints,
             boolean includeDetails) {
         TraceAnalysis analysis = traceAnalyzer.analyze(job, trace);
-        JobFailureSummary failureSummary = failureSummary(projectPath, job, trace, includeDetails);
+        JobFailureSummary failureSummary = failureSummary(projectId, job, trace, includeDetails);
         RootCauseSummary primaryCause = failureSummary.primaryCause();
         String detectedCause = effectiveDetectedCause(analysis, primaryCause);
         return new JobDiagnostic(
@@ -307,8 +296,8 @@ public class PipelineDiagnosticsService {
                 failureSummary,
                 includeArtifactHints
                 ? (includeDetails
-                ? usefulArtifacts(projectPath, job, knownArtifacts)
-                : usefulArtifacts(projectPath, job, knownArtifacts).stream().limit(10).toList())
+                ? usefulArtifacts(projectId, job, knownArtifacts)
+                : usefulArtifacts(projectId, job, knownArtifacts).stream().limit(10).toList())
                 : List.of(),
                 includeRawTrace ? trace : null,
                 trace != null && trace.contains("[truncated to "),
@@ -316,7 +305,7 @@ public class PipelineDiagnosticsService {
     }
 
     private List<String> usefulArtifacts(
-            String projectPath,
+            String projectId,
             Job job,
             List<ArtifactFile> knownArtifacts
     ) {
@@ -327,13 +316,13 @@ public class PipelineDiagnosticsService {
         }
         List<ArtifactFile> artifactFiles ;
         try {
-            artifactFiles = gitlab.listArtifactArchive(
-                    "/projects/" + projectPath + "/jobs/" + job.id() + "/artifacts",
+            artifactFiles = gitlab.listJobArtifacts(
+                    projectId,
+                    String.valueOf(job.id()),
                     null,
                     true,
-                    1,
-                    100);
-        } catch (IllegalArgumentException ignored) {
+                    new GitlabPageRequest(1, 100));
+        } catch (GitlabNotFoundException ignored) {
             return artifactHintDetector.usefulArtifacts(job, List.of());
         }
         return artifactHintDetector.usefulArtifacts(job, artifactFiles).stream()
@@ -341,11 +330,12 @@ public class PipelineDiagnosticsService {
                 .toList();
     }
 
-    private JobFailureSummary failureSummary(String projectPath, Job job, String trace, boolean includeDetails) {
+    private JobFailureSummary failureSummary(String projectId, Job job, String trace, boolean includeDetails) {
         MavenFailureSummary maven = mavenFailureAnalyzer.analyze(trace);
-        maven = mavenFailureAnalyzer.merge(maven, artifactMavenSummary(projectPath, job.id()));
+        maven = mavenFailureAnalyzer.merge(maven, artifactMavenSummary(projectId, String.valueOf(job.id())));
         List<SurefireReportInsight> surefireReports = maven.testFailureDetected()
-                                                      ? analyzeSurefireReports(projectPath, job.id(), surefireReportPatterns(maven), MAX_SUREFIRE_REPORTS)
+                                                      ? analyzeSurefireReports(projectId, String.valueOf(job.id()),
+                surefireReportPatterns(maven), MAX_SUREFIRE_REPORTS)
                                                       : List.of();
         LogMatchResult importantTraceMatches = logMatcher.importantMatches(trace);
         RootCauseSummary primaryCause = primaryCause(maven, surefireReports, importantTraceMatches);
@@ -468,8 +458,8 @@ public class PipelineDiagnosticsService {
     }
 
     private List<SurefireReportInsight> analyzeSurefireReports(
-            String projectPath,
-            Long jobId,
+            String projectId,
+            String jobId,
             List<String> patterns,
             int maxReports) {
         List<SurefireReportInsight> result = new ArrayList<>();
@@ -481,13 +471,13 @@ public class PipelineDiagnosticsService {
             }
             List<ArtifactFile> files;
             try {
-                files = gitlab.findArtifactArchiveFiles(
-                        "/projects/" + projectPath + "/jobs/" + jobId + "/artifacts",
+                files = gitlab.findJobArtifactFiles(
+                        projectId,
+                        jobId,
                         pattern,
                         true,
-                        1,
-                        maxReports);
-            } catch (IllegalArgumentException ignored) {
+                        new GitlabPageRequest(1, maxReports));
+            } catch (GitlabNotFoundException ignored) {
                 continue;
             }
             for (ArtifactFile file : files) {
@@ -496,8 +486,10 @@ public class PipelineDiagnosticsService {
                         || !seenReportClasses.add(reportClassKey(file.path()))) {
                     continue;
                 }
-                String text = gitlab.getLimitedText(
-                        "/projects/" + projectPath + "/jobs/" + jobId + "/artifacts/" + artifactPath(file.path()),
+                String text = gitlab.getJobArtifactFile(
+                        projectId,
+                        jobId,
+                        file.path(),
                         MAX_SUREFIRE_REPORT_BYTES);
                 result.add(surefireReportAnalyzer.analyze(file.path(), text));
             }
@@ -637,25 +629,27 @@ public class PipelineDiagnosticsService {
         return result;
     }
 
-    private MavenFailureSummary artifactMavenSummary(String projectPath, Long jobId) {
+    private MavenFailureSummary artifactMavenSummary(String projectId, String jobId) {
         try {
-            List<ArtifactFile> logs = gitlab.findArtifactArchiveFiles(
-                    "/projects/" + projectPath + "/jobs/" + jobId + "/artifacts",
+            List<ArtifactFile> logs = gitlab.findJobArtifactFiles(
+                    projectId,
+                    jobId,
                     ".*\\.log$",
                     true,
-                    1,
-                    3);
+                    new GitlabPageRequest(1, 3));
             MavenFailureSummary result = null;
             for (ArtifactFile log : logs) {
-                String text = gitlab.getTailText(
-                        "/projects/" + projectPath + "/jobs/" + jobId + "/artifacts/" + artifactPath(log.path()),
+                String text = gitlab.getJobArtifactFileTail(
+                        projectId,
+                        jobId,
+                        log.path(),
                         DEFAULT_MAX_TRACE_BYTES);
                 result = mavenFailureAnalyzer.merge(result, mavenFailureAnalyzer.analyze(text));
             }
             return result == null
                    ? noArtifactLog()
                    : result;
-        } catch (IllegalArgumentException ignored) {
+        } catch (GitlabNotFoundException ignored) {
             return noArtifactLog();
         }
     }

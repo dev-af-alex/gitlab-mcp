@@ -243,6 +243,18 @@ public class RestGitlabGateway implements GitlabGateway {
                 + normalizeArtifactPath(artifactPath), maxBytes);
     }
 
+    @Override
+    public String getJobArtifactFileTail(
+            String projectId,
+            String jobId,
+            String artifactPath,
+            Integer maxBytes
+    ) {
+        long id = gitlab.jobId(jobId);
+        return gitlab.getTailText(projectApi(projectId) + "/jobs/" + id + "/artifacts/"
+                + normalizeArtifactPath(artifactPath), maxBytes);
+    }
+
     private String projectApi(String projectId) {
         return "/projects/" + projectPath(projectId);
     }

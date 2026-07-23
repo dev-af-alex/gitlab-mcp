@@ -96,4 +96,11 @@ public interface GitlabGateway {
             String artifactPath,
             Integer maxBytes
     );
+
+    String getJobArtifactFileTail(
+            String projectId,
+            String jobId,
+            String artifactPath,
+            Integer maxBytes
+    );
 }
