@@ -9,7 +9,7 @@ that provide it with a bounded ZIP fallback on older versions.
 
 ## Requirements
 
-- JDK 21 or newer and Maven 3.9+ for a native build
+- JDK 21 or newer for a native build; the included Maven Wrapper supplies Maven
 - GitLab 15.1 or newer
 - Docker for the container image
 - Docker Desktop with MCP Toolkit enabled for Docker MCP profiles
@@ -93,7 +93,7 @@ servers with separate URLs, tokens, and allow-lists.
 Build and test:
 
 ```bash
-mvn clean verify
+./mvnw clean verify
 ```
 
 Start the stdio server:
@@ -113,7 +113,7 @@ because any non-protocol stdout output would break stdio transport.
 For development, run it without packaging:
 
 ```bash
-GITLAB_TOKEN=your-token mvn spring-boot:run
+GITLAB_TOKEN=your-token ./mvnw spring-boot:run
 ```
 
 A generic MCP client entry for the packaged JAR looks like this:
@@ -279,6 +279,11 @@ For a client configured manually over stdio, use:
   }
 }
 ```
+
+## Contributing
+
+Development uses short-lived branches, pull requests, and squash merges into `main`. See
+[CONTRIBUTING.md](CONTRIBUTING.md) for branch names, pull request requirements, and verification commands.
 
 ## License
 

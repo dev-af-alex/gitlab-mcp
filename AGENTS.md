@@ -28,8 +28,8 @@ It is a Java 21 Maven project built with Spring Boot and Spring AI. GitLab 15.1 
 ## Build and Test
 
 ```bash
-mvn test          # unit tests
-mvn clean verify  # full build, including integration tests
+./mvnw test          # unit tests
+./mvnw clean verify  # full build, including integration tests
 docker build -t gitlab-mcp:latest .
 ```
 
