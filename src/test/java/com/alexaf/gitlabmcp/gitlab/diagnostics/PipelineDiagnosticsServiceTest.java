@@ -1,6 +1,13 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
+import com.alexaf.gitlabmcp.adapter.analysis.generic.GenericTraceFailureAnalyzer;
+import com.alexaf.gitlabmcp.adapter.analysis.junit.GitlabTestReportAnalyzer;
+import com.alexaf.gitlabmcp.adapter.analysis.junit.JunitXmlFailureAnalyzer;
+import com.alexaf.gitlabmcp.adapter.analysis.maven.MavenTraceFailureAnalyzer;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.RestGitlabGateway;
 import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabServerInfoProvider;
+import com.alexaf.gitlabmcp.application.pipeline.DefaultPipelineContextCollector;
+import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
 import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
@@ -43,8 +50,22 @@ class PipelineDiagnosticsServiceTest {
         gitlab.objectResponses.put(
                 "/version",
                 new GitlabServerInfoProvider.VersionResponse("15.1.0-ee", "test"));
-        service = new PipelineDiagnosticsService(gitlab, new TraceAnalyzer(), new MavenFailureAnalyzer(),
-                new SurefireReportAnalyzer(), new LogMatcher(), new ArtifactHintDetector());
+        var gateway = new RestGitlabGateway(gitlab);
+        var traceAnalyzer = new TraceAnalyzer();
+        var mavenAnalyzer = new MavenFailureAnalyzer();
+        service = new PipelineDiagnosticsService(
+                gateway,
+                new DefaultPipelineContextCollector(gateway, 500),
+                new PipelineAnalysisEngine(List.of(
+                        new GitlabTestReportAnalyzer(),
+                        new JunitXmlFailureAnalyzer(),
+                        new MavenTraceFailureAnalyzer(mavenAnalyzer),
+                        new GenericTraceFailureAnalyzer(traceAnalyzer))),
+                traceAnalyzer,
+                mavenAnalyzer,
+                new SurefireReportAnalyzer(),
+                new LogMatcher(),
+                new ArtifactHintDetector());
     }
 
     @Test

@@ -1,17 +1,10 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
-import com.alexaf.gitlabmcp.adapter.gitlab.rest.RestGitlabGateway;
-import com.alexaf.gitlabmcp.adapter.analysis.generic.GenericTraceFailureAnalyzer;
-import com.alexaf.gitlabmcp.adapter.analysis.junit.GitlabTestReportAnalyzer;
-import com.alexaf.gitlabmcp.adapter.analysis.junit.JunitXmlFailureAnalyzer;
-import com.alexaf.gitlabmcp.adapter.analysis.maven.MavenTraceFailureAnalyzer;
-import com.alexaf.gitlabmcp.application.pipeline.DefaultPipelineContextCollector;
 import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
 import com.alexaf.gitlabmcp.domain.PipelineAnalysis;
 import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.FileChange;
@@ -67,29 +60,6 @@ public class PipelineDiagnosticsService {
         this.surefireReportAnalyzer = surefireReportAnalyzer;
         this.logMatcher = logMatcher;
         this.artifactHintDetector = artifactHintDetector;
-    }
-
-    public PipelineDiagnosticsService(
-            GitlabApiClient gitlab,
-            TraceAnalyzer traceAnalyzer,
-            MavenFailureAnalyzer mavenFailureAnalyzer,
-            SurefireReportAnalyzer surefireReportAnalyzer,
-            LogMatcher logMatcher,
-            ArtifactHintDetector artifactHintDetector
-    ) {
-        this(
-                new RestGitlabGateway(gitlab),
-                new DefaultPipelineContextCollector(new RestGitlabGateway(gitlab), 500),
-                new PipelineAnalysisEngine(List.of(
-                        new GitlabTestReportAnalyzer(),
-                        new JunitXmlFailureAnalyzer(),
-                        new MavenTraceFailureAnalyzer(mavenFailureAnalyzer),
-                        new GenericTraceFailureAnalyzer(traceAnalyzer))),
-                traceAnalyzer,
-                mavenFailureAnalyzer,
-                surefireReportAnalyzer,
-                logMatcher,
-                artifactHintDetector);
     }
 
     private static String simpleName(String className) {

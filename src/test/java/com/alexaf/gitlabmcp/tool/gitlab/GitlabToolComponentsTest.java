@@ -1,12 +1,11 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
 import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
 import com.alexaf.gitlabmcp.domain.GitlabVersion;
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
-import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.ArtifactHintDetector;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.LogMatcher;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.MavenFailureAnalyzer;
@@ -24,10 +23,9 @@ import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
-import com.fasterxml.jackson.databind.ObjectMapper;
+import com.alexaf.gitlabmcp.port.PipelineContextCollector;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.springframework.web.client.RestClient;
 
 import java.util.List;
 
@@ -39,7 +37,6 @@ import static org.mockito.Mockito.when;
 
 class GitlabToolComponentsTest {
 
-    private RecordingGitlabApiClient gitlab;
     private GitlabGateway gateway;
     private JsonResponseWriter responseWriter;
     private RecordingPipelineDiagnosticsService diagnosticsService;
@@ -72,11 +69,10 @@ class GitlabToolComponentsTest {
 
     @BeforeEach
     void setUp() {
-        gitlab = new RecordingGitlabApiClient();
         gateway = mock(GitlabGateway.class);
         responseWriter = mock(JsonResponseWriter.class);
         when(responseWriter.write(any())).thenReturn("json");
-        diagnosticsService = new RecordingPipelineDiagnosticsService(gitlab);
+        diagnosticsService = new RecordingPipelineDiagnosticsService(gateway);
         projectTools = new GitlabProjectTools(gateway, responseWriter);
         mergeRequestTools = new GitlabMergeRequestTools(gateway, responseWriter);
         pipelineTools = new GitlabPipelineTools(gateway, responseWriter);
@@ -330,12 +326,6 @@ class GitlabToolComponentsTest {
         verify(responseWriter).write(result);
     }
 
-    private record Call(String path, Class<?> type, List<GitlabApiClient.QueryParam> params) {
-    }
-
-    private record TextCall(String path, Integer maxBytes) {
-    }
-
     private record DiagnosticCall(
             String projectId,
             String pipelineId,
@@ -348,21 +338,21 @@ class GitlabToolComponentsTest {
     ) {
     }
 
-    private record ArtifactArchiveCall(String path, String artifactPath, Boolean recursive, Integer page,
-                                       Integer perPage) {
-    }
-
-    private record FindArtifactCall(String path, String pattern, Boolean regex, Integer page, Integer perPage) {
-    }
-
     private static final class RecordingPipelineDiagnosticsService extends PipelineDiagnosticsService {
 
         private PipelineDiagnosticsResult result;
         private DiagnosticCall lastCall;
 
-        private RecordingPipelineDiagnosticsService(GitlabApiClient gitlab) {
-            super(gitlab, new TraceAnalyzer(), new MavenFailureAnalyzer(), new SurefireReportAnalyzer(),
-                    new LogMatcher(), new ArtifactHintDetector());
+        private RecordingPipelineDiagnosticsService(GitlabGateway gitlab) {
+            super(
+                    gitlab,
+                    mock(PipelineContextCollector.class),
+                    mock(PipelineAnalysisEngine.class),
+                    new TraceAnalyzer(),
+                    new MavenFailureAnalyzer(),
+                    new SurefireReportAnalyzer(),
+                    new LogMatcher(),
+                    new ArtifactHintDetector());
         }
 
         @Override
@@ -389,114 +379,4 @@ class GitlabToolComponentsTest {
         }
     }
 
-    private static final class RecordingGitlabApiClient extends GitlabApiClient {
-
-        private Object objectResponse;
-        private List<?> listResponse = List.of();
-        private String textResponse = "";
-        private List<ArtifactFile> artifactFilesResponse = List.of();
-        private Object jsonInput;
-        private Call lastCall;
-        private TextCall lastTextCall;
-        private TextCall lastTailCall;
-        private ArtifactArchiveCall lastArtifactArchiveCall;
-        private FindArtifactCall lastFindArtifactCall;
-        private String projectPathReturn = "project";
-        private String projectIdInput;
-        private long mergeRequestIidReturn = 1L;
-        private String mergeRequestIidInput;
-        private long pipelineIdReturn = 123L;
-        private String pipelineIdInput;
-        private long jobIdReturn = 8L;
-        private String jobIdInput;
-        private String stateInput;
-
-        private RecordingGitlabApiClient() {
-            super(new GitlabProperties("https://gitlab.example", "token", List.of(), 20, 100),
-                    new ObjectMapper(), RestClient.builder());
-        }
-
-        @Override
-        public <T> T getObject(String path, Class<T> type, QueryParam... queryParams) {
-            lastCall = new Call(path, type, List.of(queryParams));
-            return type.cast(objectResponse);
-        }
-
-        @SuppressWarnings("unchecked")
-        @Override
-        public <T> List<T> getList(String path, Class<T> itemType, QueryParam... queryParams) {
-            lastCall = new Call(path, itemType, List.of(queryParams));
-            return (List<T>) listResponse;
-        }
-
-        @Override
-        public String getLimitedText(String path, Integer maxBytes, QueryParam... queryParams) {
-            lastTextCall = new TextCall(path, maxBytes);
-            return textResponse;
-        }
-
-        @Override
-        public String getTailText(String path, Integer maxBytes, QueryParam... queryParams) {
-            lastTailCall = new TextCall(path, maxBytes);
-            return textResponse;
-        }
-
-        @Override
-        public List<ArtifactFile> listArtifactArchive(String archivePath, String path, Boolean recursive, Integer page, Integer perPage) {
-            lastArtifactArchiveCall = new ArtifactArchiveCall(archivePath, path, recursive, page, perPage);
-            return artifactFilesResponse;
-        }
-
-        @Override
-        public List<ArtifactFile> findArtifactArchiveFiles(String archivePath, String pattern, Boolean regex, Integer page, Integer perPage) {
-            lastFindArtifactCall = new FindArtifactCall(archivePath, pattern, regex, page, perPage);
-            return artifactFilesResponse;
-        }
-
-        @Override
-        public String json(Object value) {
-            jsonInput = value;
-            return "json";
-        }
-
-        @Override
-        public String projectPath(String projectId) {
-            projectIdInput = projectId;
-            return projectPathReturn;
-        }
-
-        @Override
-        public long mergeRequestIid(String value) {
-            mergeRequestIidInput = value;
-            return mergeRequestIidReturn;
-        }
-
-        @Override
-        public long pipelineId(String value) {
-            pipelineIdInput = value;
-            return pipelineIdReturn;
-        }
-
-        @Override
-        public long jobId(String value) {
-            jobIdInput = value;
-            return jobIdReturn;
-        }
-
-        @Override
-        public String mergeRequestState(String state) {
-            stateInput = state;
-            return "open".equals(state) ? "opened" : state;
-        }
-
-        @Override
-        public int page(Integer page) {
-            return page == null ? 1 : page;
-        }
-
-        @Override
-        public int perPage(Integer perPage) {
-            return perPage == null ? 20 : perPage;
-        }
-    }
 }
