@@ -7,6 +7,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -16,6 +17,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 class RestGitlabGatewayTest {
 
@@ -35,6 +37,7 @@ class RestGitlabGatewayTest {
 
     @Test
     void readsMergeRequestChangesThroughGitlab15CompatibleEndpoint() {
+        expectVersion("15.1.0-ee");
         server.expect(once(), requestTo(
                         "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/changes"))
                 .andRespond(withSuccess("""
@@ -52,6 +55,56 @@ class RestGitlabGatewayTest {
         assertThat(changes.iid()).isEqualTo(17);
         assertThat(changes.changes()).singleElement()
                 .satisfies(change -> assertThat(change.newPath()).isEqualTo("b.txt"));
+        server.verify();
+    }
+
+    @Test
+    void usesPaginatedDiffEndpointOnGitlab15_7AndNewer() {
+        expectVersion("15.7.0-ee");
+        server.expect(once(), requestTo(
+                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
+                                + "?page=1&per_page=100"))
+                .andRespond(withSuccess("""
+                        [{"old_path": "a.txt", "new_path": "b.txt", "diff": "@@"}]
+                        """, MediaType.APPLICATION_JSON));
+        server.expect(once(), requestTo(
+                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17"))
+                .andRespond(withSuccess("""
+                        {
+                          "id": 101,
+                          "iid": 17,
+                          "project_id": 3,
+                          "title": "Change",
+                          "state": "opened",
+                          "target_branch": "main",
+                          "source_branch": "feature"
+                        }
+                        """, MediaType.APPLICATION_JSON));
+
+        var changes = gateway.getMergeRequestChanges("group/repo", "!17");
+
+        assertThat(changes.title()).isEqualTo("Change");
+        assertThat(changes.changes()).singleElement()
+                .satisfies(change -> assertThat(change.newPath()).isEqualTo("b.txt"));
+        server.verify();
+    }
+
+    @Test
+    void fallsBackToLegacyChangesWhenDiffEndpointIsUnavailable() {
+        expectVersion("18.8.0-ee");
+        server.expect(once(), requestTo(
+                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
+                                + "?page=1&per_page=100"))
+                .andRespond(withStatus(HttpStatus.NOT_FOUND));
+        server.expect(once(), requestTo(
+                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/changes"))
+                .andRespond(withSuccess("""
+                        {"id": 101, "iid": 17, "changes": []}
+                        """, MediaType.APPLICATION_JSON));
+
+        var changes = gateway.getMergeRequestChanges("group/repo", "!17");
+
+        assertThat(changes.iid()).isEqualTo(17);
         server.verify();
     }
 
@@ -80,10 +133,7 @@ class RestGitlabGatewayTest {
 
     @Test
     void readsAndCachesGitlabServerInformation() {
-        server.expect(once(), requestTo("https://gitlab.example/api/v4/version"))
-                .andRespond(withSuccess("""
-                        {"version": "15.1.0-ee", "revision": "abc123"}
-                        """, MediaType.APPLICATION_JSON));
+        expectVersion("15.1.0-ee");
 
         var first = gateway.getServerInfo();
         var second = gateway.getServerInfo();
@@ -92,5 +142,12 @@ class RestGitlabGatewayTest {
         assertThat(first.version().raw()).isEqualTo("15.1.0-ee");
         assertThat(first.supported()).isTrue();
         server.verify();
+    }
+
+    private void expectVersion(String version) {
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/version"))
+                .andRespond(withSuccess("""
+                        {"version": "%s", "revision": "abc123"}
+                        """.formatted(version), MediaType.APPLICATION_JSON));
     }
 }

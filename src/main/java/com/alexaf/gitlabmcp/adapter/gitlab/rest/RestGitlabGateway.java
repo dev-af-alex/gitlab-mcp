@@ -24,18 +24,25 @@ public class RestGitlabGateway implements GitlabGateway {
 
     private final GitlabApiClient gitlab;
     private final GitlabServerInfoProvider serverInfoProvider;
+    private final MergeRequestDiffProvider mergeRequestDiffProvider;
 
     @Autowired
     public RestGitlabGateway(
             GitlabApiClient gitlab,
-            GitlabServerInfoProvider serverInfoProvider
+            GitlabServerInfoProvider serverInfoProvider,
+            MergeRequestDiffProvider mergeRequestDiffProvider
     ) {
         this.gitlab = gitlab;
         this.serverInfoProvider = serverInfoProvider;
+        this.mergeRequestDiffProvider = mergeRequestDiffProvider;
     }
 
     public RestGitlabGateway(GitlabApiClient gitlab) {
-        this(gitlab, new GitlabServerInfoProvider(gitlab, new GitlabCapabilityResolver()));
+        GitlabServerInfoProvider serverInfoProvider =
+                new GitlabServerInfoProvider(gitlab, new GitlabCapabilityResolver());
+        this.gitlab = gitlab;
+        this.serverInfoProvider = serverInfoProvider;
+        this.mergeRequestDiffProvider = new MergeRequestDiffProvider(gitlab, serverInfoProvider);
     }
 
     @Override
@@ -84,8 +91,7 @@ public class RestGitlabGateway implements GitlabGateway {
 
     @Override
     public MergeRequestChanges getMergeRequestChanges(String projectId, String mergeRequestIid) {
-        return gitlab.getObject(mergeRequestApi(projectId, mergeRequestIid) + "/changes",
-                MergeRequestChanges.class);
+        return mergeRequestDiffProvider.get(mergeRequestApi(projectId, mergeRequestIid));
     }
 
     @Override
