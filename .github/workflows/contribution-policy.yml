@@ -1,0 +1,37 @@
+name: Contribution policy
+
+on:
+  pull_request:
+    types:
+      - opened
+      - edited
+      - synchronize
+      - reopened
+
+permissions:
+  contents: read
+
+jobs:
+  contribution-policy:
+    name: Contribution policy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+          ref: ${{ github.event.pull_request.head.sha }}
+      - name: Validate pull request metadata
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_BRANCH: ${{ github.head_ref }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: node .github/scripts/validate-pull-request.mjs
+      - name: Reject merge commits
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+        run: |
+          if git rev-list --merges "$BASE_SHA..HEAD" | grep --quiet .; then
+            echo "::error::Pull request branches must not contain merge commits. Rebase the branch on main."
+            git rev-list --merges --oneline "$BASE_SHA..HEAD"
+            exit 1
+          fi
