@@ -1,5 +1,11 @@
 package com.alexaf.gitlabmcp.gitlab.client;
 
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabApiException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabForbiddenException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabRateLimitedException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabServerException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabUnauthorizedException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.SerializationFeature;
 import org.junit.jupiter.api.Test;
@@ -8,6 +14,7 @@ import org.junit.jupiter.params.provider.Arguments;
 import org.junit.jupiter.params.provider.MethodSource;
 import org.springframework.http.HttpMethod;
 import org.springframework.http.MediaType;
+import org.springframework.http.HttpStatus;
 import org.springframework.test.web.client.MockRestServiceServer;
 import org.springframework.web.client.RestClient;
 
@@ -24,6 +31,7 @@ import static org.springframework.test.web.client.match.MockRestRequestMatchers.
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
 
 class GitlabApiClientTest {
 
@@ -240,6 +248,55 @@ class GitlabApiClientTest {
 
         assertThat(client.getRawText("/projects/1/jobs/8/trace")).isEqualTo("{not-json}\nline 2");
         server.verify();
+    }
+
+    @ParameterizedTest
+    @MethodSource("gitlabErrorStatuses")
+    void getMapsHttpStatusesToTypedExceptions(
+            HttpStatus status,
+            Class<? extends GitlabApiException> exceptionType
+    ) {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GitlabApiClient client = client(
+                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
+                builder);
+
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/user"))
+                .andRespond(withStatus(status).header("Retry-After", "7"));
+
+        assertThatThrownBy(() -> client.get("/user"))
+                .isInstanceOf(exceptionType)
+                .satisfies(error -> assertThat(((GitlabApiException) error).statusCode())
+                        .isEqualTo(status.value()));
+        server.verify();
+    }
+
+    @Test
+    void rateLimitExceptionExposesRetryDelay() {
+        RestClient.Builder builder = RestClient.builder();
+        MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
+        GitlabApiClient client = client(
+                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
+                builder);
+
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/user"))
+                .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", "7"));
+
+        assertThatThrownBy(() -> client.get("/user"))
+                .isInstanceOf(GitlabRateLimitedException.class)
+                .satisfies(error -> assertThat(((GitlabRateLimitedException) error).retryAfter())
+                        .hasSeconds(7));
+    }
+
+    private static Stream<Arguments> gitlabErrorStatuses() {
+        return Stream.of(
+                Arguments.of(HttpStatus.UNAUTHORIZED, GitlabUnauthorizedException.class),
+                Arguments.of(HttpStatus.FORBIDDEN, GitlabForbiddenException.class),
+                Arguments.of(HttpStatus.NOT_FOUND, GitlabNotFoundException.class),
+                Arguments.of(HttpStatus.TOO_MANY_REQUESTS, GitlabRateLimitedException.class),
+                Arguments.of(HttpStatus.BAD_GATEWAY, GitlabServerException.class)
+        );
     }
 
     @Test

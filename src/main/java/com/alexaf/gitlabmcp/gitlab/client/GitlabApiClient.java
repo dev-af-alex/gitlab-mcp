@@ -1,5 +1,14 @@
 package com.alexaf.gitlabmcp.gitlab.client;
 
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabApiException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabClientException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDecodeException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabForbiddenException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabRateLimitedException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabServerException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabTransportException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabUnauthorizedException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.fasterxml.jackson.databind.JavaType;
 import com.fasterxml.jackson.databind.JsonNode;
@@ -8,8 +17,9 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
-import org.springframework.web.client.HttpClientErrorException;
+import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClient;
+import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 import org.springframework.web.util.UriUtils;
 
@@ -24,6 +34,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardOpenOption;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
@@ -329,12 +340,10 @@ public class GitlabApiClient {
                     .header("PRIVATE-TOKEN", requireToken(properties.token()))
                     .retrieve()
                     .body(String.class);
-        } catch (HttpClientErrorException.NotFound e) {
-            throw new IllegalArgumentException("GitLab resource not found: " + uri, e);
-        } catch (HttpClientErrorException.Forbidden e) {
-            throw new IllegalArgumentException("GitLab access denied for: " + uri, e);
-        } catch (HttpClientErrorException.Unauthorized e) {
-            throw new IllegalArgumentException("GitLab token is missing, expired, or invalid", e);
+        } catch (RestClientResponseException e) {
+            throw clientException(uri, e.getStatusCode(), e.getResponseHeaders(), e);
+        } catch (RestClientException e) {
+            throw new GitlabTransportException(uri, e);
         }
     }
 
@@ -551,10 +560,10 @@ public class GitlabApiClient {
                     .exchange((request, response) -> {
                         HttpStatusCode status = response.getStatusCode();
                         if (status.is4xxClientError()) {
-                            throw clientException(uri, status);
+                            throw clientException(uri, status, response.getHeaders(), null);
                         }
                         if (status.is5xxServerError()) {
-                            throw new IllegalArgumentException("GitLab server error for: " + uri + " (" + status + ")");
+                            throw new GitlabServerException(uri, status.value());
                         }
                         Path file = Files.createTempFile("gitlab-mcp-", ".tmp");
                         try (var input = response.getBody();
@@ -566,10 +575,10 @@ public class GitlabApiClient {
                         }
                         return file;
                     });
-        } catch (IllegalArgumentException e) {
+        } catch (GitlabApiException e) {
             throw e;
         } catch (Exception e) {
-            throw new IllegalArgumentException("Unable to request GitLab resource: " + uri, e);
+            throw new GitlabTransportException(uri, e);
         }
     }
 
@@ -652,24 +661,50 @@ public class GitlabApiClient {
         return bytes;
     }
 
-    private IllegalArgumentException clientException(URI uri, HttpStatusCode status) {
+    private GitlabApiException clientException(
+            URI uri,
+            HttpStatusCode status,
+            HttpHeaders headers,
+            Throwable cause
+    ) {
         if (status.value() == 404) {
-            return new IllegalArgumentException("GitLab resource not found: " + uri);
+            return new GitlabNotFoundException(uri, cause);
         }
         if (status.value() == 403) {
-            return new IllegalArgumentException("GitLab access denied for: " + uri);
+            return new GitlabForbiddenException(uri, cause);
         }
         if (status.value() == 401) {
-            return new IllegalArgumentException("GitLab token is missing, expired, or invalid");
+            return new GitlabUnauthorizedException(uri, cause);
         }
-        return new IllegalArgumentException("GitLab client error for: " + uri + " (" + status + ")");
+        if (status.value() == 429) {
+            return new GitlabRateLimitedException(uri, retryAfter(headers), cause);
+        }
+        if (status.is5xxServerError()) {
+            return new GitlabServerException(uri, status.value(), cause);
+        }
+        return new GitlabClientException(uri, status.value(), cause);
+    }
+
+    private Duration retryAfter(HttpHeaders headers) {
+        if (headers == null) {
+            return null;
+        }
+        String value = headers.getFirst(HttpHeaders.RETRY_AFTER);
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+        try {
+            return Duration.ofSeconds(Long.parseLong(value.trim()));
+        } catch (NumberFormatException ignored) {
+            return null;
+        }
     }
 
     private <T> T readValue(String response, Class<T> type) {
         try {
             return objectMapper.readValue(response, type);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Unable to parse GitLab response as " + type.getSimpleName(), e);
+            throw new GitlabDecodeException(" as " + type.getSimpleName(), e);
         }
     }
 
@@ -677,7 +712,7 @@ public class GitlabApiClient {
         try {
             return objectMapper.readValue(response, type);
         } catch (Exception e) {
-            throw new IllegalArgumentException("Unable to parse GitLab response", e);
+            throw new GitlabDecodeException("", e);
         }
     }
 
