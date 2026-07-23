@@ -1,0 +1,153 @@
+{
+  "name": "gitlab-mcp",
+  "type": "server",
+  "image": "gitlab-mcp:local",
+  "description": "Read-only GitLab MCP server for merge request, pipeline, and CI diagnostics workflows.",
+  "title": "GitLab MCP",
+  "icon": "https://avatars.githubusercontent.com/u/1086321?s=200&v=4",
+  "tools": [
+    {
+      "name": "gitlab_get_current_user",
+      "description": "Get the GitLab user associated with the configured token."
+    },
+    {
+      "name": "gitlab_search_projects",
+      "description": "Search GitLab projects visible to the token."
+    },
+    {
+      "name": "gitlab_get_project",
+      "description": "Get a GitLab project by numeric id, path, repository URL, or GitLab web URL."
+    },
+    {
+      "name": "gitlab_list_merge_requests",
+      "description": "List merge requests for a project, with optional state, branch, author, reviewer, search, and pagination filters."
+    },
+    {
+      "name": "gitlab_get_merge_request",
+      "description": "Get one merge request by project and MR IID."
+    },
+    {
+      "name": "gitlab_get_merge_request_changes",
+      "description": "Get changed files and diffs for a merge request."
+    },
+    {
+      "name": "gitlab_get_merge_request_commits",
+      "description": "Get commits included in a merge request."
+    },
+    {
+      "name": "gitlab_get_merge_request_discussions",
+      "description": "Get discussion threads and notes for a merge request."
+    },
+    {
+      "name": "gitlab_get_merge_request_pipelines",
+      "description": "Get pipelines related to a merge request."
+    },
+    {
+      "name": "gitlab_get_pipeline",
+      "description": "Get one GitLab pipeline by pipeline id or URL."
+    },
+    {
+      "name": "gitlab_list_pipeline_jobs",
+      "description": "List jobs for a GitLab pipeline by pipeline id or URL."
+    },
+    {
+      "name": "gitlab_get_job_trace",
+      "description": "Get the redacted tail of a GitLab job trace by job id or URL, optionally truncated by max bytes."
+    },
+    {
+      "name": "gitlab_get_job_trace_tail",
+      "description": "Get the redacted tail of a GitLab job trace by job id or URL."
+    },
+    {
+      "name": "gitlab_get_job_trace_matches",
+      "description": "Search the redacted tail of a GitLab job trace and return matching lines with context."
+    },
+    {
+      "name": "gitlab_list_job_artifacts",
+      "description": "List files in a GitLab job artifacts ZIP archive by job id or URL without using /artifacts/tree."
+    },
+    {
+      "name": "gitlab_find_job_artifact_files",
+      "description": "Find file paths in a GitLab job artifacts ZIP archive by glob or regex."
+    },
+    {
+      "name": "gitlab_get_job_artifact_file",
+      "description": "Get one text file from a GitLab job artifacts archive by job id or URL, redacted and optionally truncated."
+    },
+    {
+      "name": "gitlab_extract_job_failure_summary",
+      "description": "Extract a compact Maven/Surefire-aware failure summary from a failed GitLab job trace and bounded reports; full evidence is opt-in."
+    },
+    {
+      "name": "gitlab_analyze_job_surefire_reports",
+      "description": "Analyze failed Maven test classes selected from the job log and read their bounded Surefire .txt or TEST-*.xml reports for method-level details and likely root causes."
+    },
+    {
+      "name": "gitlab_analyze_failed_pipeline",
+      "description": "Analyze a failed GitLab pipeline by pipeline id/URL or merge request IID/URL with compact root cause, failed tests, and cascade grouping. Full trace/report context and diffs are opt-in."
+    },
+    {
+      "name": "gitlab_analyze_mr_pipeline_failure",
+      "description": "Analyze the latest failed merge request pipeline with compact Maven/Surefire root cause, failed tests, cascade grouping, and changed-file correlation. Full context and diffs are opt-in."
+    }
+  ],
+  "secrets": [
+    {
+      "name": "gitlab-mcp.personal_access_token",
+      "env": "GITLAB_TOKEN",
+      "example": "glpat-...",
+      "description": "GitLab Personal Access Token with read_api scope."
+    }
+  ],
+  "config": [
+    {
+      "name": "gitlab-mcp",
+      "description": "Configure the GitLab instance and read-only access limits.",
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "description": "GitLab base URL.",
+          "default": "https://gitlab.com"
+        },
+        "allowed_projects": {
+          "type": "string",
+          "description": "Optional comma-separated project IDs or paths.",
+          "default": ""
+        },
+        "default_per_page": {
+          "type": "number",
+          "description": "Default number of results per page.",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 100
+        },
+        "max_per_page": {
+          "type": "number",
+          "description": "Maximum permitted number of results per page.",
+          "default": 100,
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    }
+  ],
+  "env": [
+    {
+      "name": "GITLAB_URL",
+      "value": "{{gitlab-mcp.url}}"
+    },
+    {
+      "name": "GITLAB_ALLOWED_PROJECTS",
+      "value": "{{gitlab-mcp.allowed_projects}}"
+    },
+    {
+      "name": "GITLAB_DEFAULT_PER_PAGE",
+      "value": "{{gitlab-mcp.default_per_page}}"
+    },
+    {
+      "name": "GITLAB_MAX_PER_PAGE",
+      "value": "{{gitlab-mcp.max_per_page}}"
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+.git/
+.idea/
+.codex/
+target/
+*.iml
+README.md
+docker-mcp/

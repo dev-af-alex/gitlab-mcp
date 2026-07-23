@@ -1,0 +1,26 @@
+spring:
+  application:
+    name: gitlab-mcp
+  main:
+    banner-mode: off
+    web-application-type: none
+  ai:
+    mcp:
+      server:
+        name: gitlab-mcp
+        version: 0.1.0
+        stdio: true
+        type: SYNC
+        annotation-scanner:
+          enabled: true
+
+logging:
+  level:
+    root: OFF
+
+gitlab:
+  url: ${GITLAB_URL:https://gitlab.com}
+  token: ${GITLAB_TOKEN:}
+  allowed-projects: ${GITLAB_ALLOWED_PROJECTS:}
+  default-per-page: ${GITLAB_DEFAULT_PER_PAGE:20}
+  max-per-page: ${GITLAB_MAX_PER_PAGE:100}
