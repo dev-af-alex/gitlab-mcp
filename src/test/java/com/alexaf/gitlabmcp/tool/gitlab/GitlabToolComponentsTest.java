@@ -77,8 +77,8 @@ class GitlabToolComponentsTest {
         diagnosticsService = new RecordingPipelineDiagnosticsService(gitlab);
         projectTools = new GitlabProjectTools(gateway, responseWriter);
         mergeRequestTools = new GitlabMergeRequestTools(gateway, responseWriter);
-        pipelineTools = new GitlabPipelineTools(gitlab);
-        jobTools = new GitlabJobTools(gitlab);
+        pipelineTools = new GitlabPipelineTools(gateway, responseWriter);
+        jobTools = new GitlabJobTools(gateway, responseWriter);
         diagnosticsTools = new GitlabDiagnosticsTools(gitlab, diagnosticsService);
     }
 
@@ -204,101 +204,90 @@ class GitlabToolComponentsTest {
     @Test
     void getPipelineMapsProjectAndPipelineIdToEndpoint() {
         Pipeline pipeline = pipeline(123L);
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.objectResponse = pipeline;
+        when(gateway.getPipeline("group/repo", "pipeline-url")).thenReturn(pipeline);
 
         String response = pipelineTools.getPipeline("group/repo", "pipeline-url");
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.projectIdInput).isEqualTo("group/repo");
-        assertThat(gitlab.pipelineIdInput).isEqualTo("pipeline-url");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo/pipelines/123", Pipeline.class, List.of()));
-        assertThat(gitlab.jsonInput).isSameAs(pipeline);
+        verify(gateway).getPipeline("group/repo", "pipeline-url");
+        verify(responseWriter).write(pipeline);
     }
 
     @Test
     void listPipelineJobsMapsProjectPipelineAndPagination() {
         List<Job> jobs = List.of(job(8L, "test"));
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.listResponse = jobs;
+        when(gateway.listPipelineJobs(
+                "group/repo", "pipeline-url", true, new GitlabPageRequest(2, 30))).thenReturn(jobs);
 
         String response = pipelineTools.listPipelineJobs("group/repo", "pipeline-url", true, 2, 30);
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.pipelineIdInput).isEqualTo("pipeline-url");
-        assertThat(gitlab.lastCall).isEqualTo(new Call("/projects/group%2Frepo/pipelines/123/jobs",
-                Job.class, List.of(
-                new GitlabApiClient.QueryParam("include_retried", true),
-                new GitlabApiClient.QueryParam("page", 2),
-                new GitlabApiClient.QueryParam("per_page", 30)
-        )));
-        assertThat(gitlab.jsonInput).isSameAs(jobs);
+        verify(gateway).listPipelineJobs(
+                "group/repo", "pipeline-url", true, new GitlabPageRequest(2, 30));
+        verify(responseWriter).write(jobs);
     }
 
     @Test
     void getJobTraceMapsProjectJobAndDefaultLimitToTraceEndpoint() {
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.textResponse = "trace";
+        when(gateway.getJobTraceTail("group/repo", "job-url", 60_000)).thenReturn("trace");
 
         String response = jobTools.getJobTrace("group/repo", "job-url", null);
 
         assertThat(response).isEqualTo("trace");
-        assertThat(gitlab.jobIdInput).isEqualTo("job-url");
-        assertThat(gitlab.lastTailCall).isEqualTo(new TextCall("/projects/group%2Frepo/jobs/8/trace", 60_000));
+        verify(gateway).getJobTraceTail("group/repo", "job-url", 60_000);
     }
 
     @Test
     void getJobTraceTailMapsProjectJobAndExplicitLimitToTraceEndpoint() {
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.textResponse = "trace tail";
+        when(gateway.getJobTraceTail("group/repo", "job-url", 4096)).thenReturn("trace tail");
 
         String response = jobTools.getJobTraceTail("group/repo", "job-url", 4096);
 
         assertThat(response).isEqualTo("trace tail");
-        assertThat(gitlab.jobIdInput).isEqualTo("job-url");
-        assertThat(gitlab.lastTailCall).isEqualTo(new TextCall("/projects/group%2Frepo/jobs/8/trace", 4096));
+        verify(gateway).getJobTraceTail("group/repo", "job-url", 4096);
     }
 
     @Test
     void listJobArtifactsReadsArchiveAndAppliesFiltersAndPagination() {
         List<ArtifactFile> artifacts = List.of(new ArtifactFile("junit.xml", "target/junit.xml", "file", 42L, "100644"));
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.artifactFilesResponse = artifacts;
+        when(gateway.listJobArtifacts(
+                "group/repo", "job-url", "target", true, new GitlabPageRequest(3, 40)))
+                .thenReturn(artifacts);
 
         String response = jobTools.listJobArtifacts("group/repo", "job-url", "target", true, 3, 40);
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.jobIdInput).isEqualTo("job-url");
-        assertThat(gitlab.lastArtifactArchiveCall).isEqualTo(new ArtifactArchiveCall(
-                "/projects/group%2Frepo/jobs/8/artifacts", "target", true, 3, 40));
-        assertThat(gitlab.jsonInput).isSameAs(artifacts);
+        verify(gateway).listJobArtifacts(
+                "group/repo", "job-url", "target", true, new GitlabPageRequest(3, 40));
+        verify(responseWriter).write(artifacts);
     }
 
     @Test
     void findJobArtifactFilesReadsArchiveAndAppliesPattern() {
         List<ArtifactFile> artifacts = List.of(new ArtifactFile("TEST.xml", "target/TEST.xml", "file", 42L, null));
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.artifactFilesResponse = artifacts;
+        when(gateway.findJobArtifactFiles(
+                "group/repo", "job-url", "**/TEST-*.xml", false, new GitlabPageRequest(1, 20)))
+                .thenReturn(artifacts);
 
         String response = jobTools.findJobArtifactFiles("group/repo", "job-url", "**/TEST-*.xml", false, 1, 20);
 
         assertThat(response).isEqualTo("json");
-        assertThat(gitlab.lastFindArtifactCall).isEqualTo(new FindArtifactCall(
-                "/projects/group%2Frepo/jobs/8/artifacts", "**/TEST-*.xml", false, 1, 20));
-        assertThat(gitlab.jsonInput).isSameAs(artifacts);
+        verify(gateway).findJobArtifactFiles(
+                "group/repo", "job-url", "**/TEST-*.xml", false, new GitlabPageRequest(1, 20));
+        verify(responseWriter).write(artifacts);
     }
 
     @Test
     void getJobArtifactFileMapsProjectJobArtifactPathAndLimit() {
-        gitlab.projectPathReturn = "group%2Frepo";
-        gitlab.textResponse = "artifact";
+        when(gateway.getJobArtifactFile(
+                "group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048))
+                .thenReturn("artifact");
 
         String response = jobTools.getJobArtifactFile("group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048);
 
         assertThat(response).isEqualTo("artifact");
-        assertThat(gitlab.jobIdInput).isEqualTo("job-url");
-        assertThat(gitlab.lastTextCall).isEqualTo(new TextCall(
-                "/projects/group%2Frepo/jobs/8/artifacts/target/surefire-reports/TEST.xml", 2048));
+        verify(gateway).getJobArtifactFile(
+                "group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048);
     }
 
     @Test

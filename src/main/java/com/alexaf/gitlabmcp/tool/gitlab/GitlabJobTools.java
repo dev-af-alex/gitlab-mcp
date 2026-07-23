@@ -1,6 +1,8 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
 import org.springframework.ai.mcp.annotation.McpToolParam;
@@ -9,10 +11,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class GitlabJobTools {
 
-    private final GitlabApiClient gitlab;
+    private final GitlabGateway gitlab;
+    private final JsonResponseWriter responseWriter;
 
-    public GitlabJobTools(GitlabApiClient gitlab) {
+    public GitlabJobTools(GitlabGateway gitlab, JsonResponseWriter responseWriter) {
         this.gitlab = gitlab;
+        this.responseWriter = responseWriter;
     }
 
     @McpTool(
@@ -60,13 +64,12 @@ public class GitlabJobTools {
             Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
             Integer perPage) {
-        long id = gitlab.jobId(jobId);
-        return gitlab.json(gitlab.listArtifactArchive(
-                "/projects/" + gitlab.projectPath(projectId) + "/jobs/" + id + "/artifacts",
+        return responseWriter.write(gitlab.listJobArtifacts(
+                projectId,
+                jobId,
                 path,
                 recursive,
-                page,
-                perPage));
+                new GitlabPageRequest(page, perPage)));
     }
 
     @McpTool(
@@ -86,13 +89,12 @@ public class GitlabJobTools {
             Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
             Integer perPage) {
-        long id = gitlab.jobId(jobId);
-        return gitlab.json(gitlab.findArtifactArchiveFiles(
-                "/projects/" + gitlab.projectPath(projectId) + "/jobs/" + id + "/artifacts",
+        return responseWriter.write(gitlab.findJobArtifactFiles(
+                projectId,
+                jobId,
                 pattern,
                 regex,
-                page,
-                perPage));
+                new GitlabPageRequest(page, perPage)));
     }
 
     @McpTool(
@@ -108,15 +110,17 @@ public class GitlabJobTools {
             String artifactPath,
             @McpToolParam(description = "Maximum file bytes to return. Defaults to 60000.", required = false)
             Integer maxBytes) {
-        long id = gitlab.jobId(jobId);
-        return gitlab.getLimitedText("/projects/" + gitlab.projectPath(projectId) + "/jobs/" + id
-                        + "/artifacts/" + GitlabToolSupport.artifactPath(artifactPath),
+        return gitlab.getJobArtifactFile(
+                projectId,
+                jobId,
+                artifactPath,
                 GitlabToolSupport.defaultMaxBytes(maxBytes));
     }
 
     private String jobTraceTail(String projectId, String jobId, Integer maxBytes) {
-        long id = gitlab.jobId(jobId);
-        return gitlab.getTailText("/projects/" + gitlab.projectPath(projectId) + "/jobs/" + id + "/trace",
+        return gitlab.getJobTraceTail(
+                projectId,
+                jobId,
                 GitlabToolSupport.defaultMaxBytes(maxBytes));
     }
 }

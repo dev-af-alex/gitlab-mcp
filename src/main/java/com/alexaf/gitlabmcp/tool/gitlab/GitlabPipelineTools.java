@@ -1,8 +1,8 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
-import com.alexaf.gitlabmcp.gitlab.dto.Job;
-import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
 import org.springframework.ai.mcp.annotation.McpToolParam;
@@ -11,10 +11,12 @@ import org.springframework.stereotype.Component;
 @Component
 public class GitlabPipelineTools {
 
-    private final GitlabApiClient gitlab;
+    private final GitlabGateway gitlab;
+    private final JsonResponseWriter responseWriter;
 
-    public GitlabPipelineTools(GitlabApiClient gitlab) {
+    public GitlabPipelineTools(GitlabGateway gitlab, JsonResponseWriter responseWriter) {
         this.gitlab = gitlab;
+        this.responseWriter = responseWriter;
     }
 
     @McpTool(
@@ -26,9 +28,7 @@ public class GitlabPipelineTools {
             String projectId,
             @McpToolParam(description = "Pipeline id or GitLab pipeline URL.")
             String pipelineId) {
-        long id = gitlab.pipelineId(pipelineId);
-        return gitlab.json(gitlab.getObject("/projects/" + gitlab.projectPath(projectId) + "/pipelines/" + id,
-                Pipeline.class));
+        return responseWriter.write(gitlab.getPipeline(projectId, pipelineId));
     }
 
     @McpTool(
@@ -46,11 +46,10 @@ public class GitlabPipelineTools {
             Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
             Integer perPage) {
-        long id = gitlab.pipelineId(pipelineId);
-        return gitlab.json(gitlab.getList("/projects/" + gitlab.projectPath(projectId) + "/pipelines/" + id + "/jobs",
-                Job.class,
-                gitlab.param("include_retried", includeRetried),
-                gitlab.param("page", gitlab.page(page)),
-                gitlab.param("per_page", gitlab.perPage(perPage))));
+        return responseWriter.write(gitlab.listPipelineJobs(
+                projectId,
+                pipelineId,
+                includeRetried,
+                new GitlabPageRequest(page, perPage)));
     }
 }
