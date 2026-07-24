@@ -18,6 +18,4 @@ public record Pipeline(
         @JsonProperty("finished_at") String finishedAt,
         Long duration,
         @JsonProperty("queued_duration") Long queuedDuration,
-        @JsonProperty("web_url") String webUrl
-) {
-}
+        @JsonProperty("web_url") String webUrl) {}

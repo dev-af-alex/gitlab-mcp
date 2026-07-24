@@ -9,6 +9,4 @@ public record PipelineBridge(
         String name,
         String stage,
         String status,
-        @JsonProperty("downstream_pipeline") Pipeline downstreamPipeline
-) {
-}
+        @JsonProperty("downstream_pipeline") Pipeline downstreamPipeline) {}

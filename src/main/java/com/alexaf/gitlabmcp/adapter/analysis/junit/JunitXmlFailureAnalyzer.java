@@ -1,13 +1,14 @@
 package com.alexaf.gitlabmcp.adapter.analysis.junit;
 
-import com.alexaf.gitlabmcp.domain.Confidence;
-import com.alexaf.gitlabmcp.domain.Evidence;
-import com.alexaf.gitlabmcp.domain.Finding;
-import com.alexaf.gitlabmcp.domain.FindingCategory;
-import com.alexaf.gitlabmcp.domain.PipelineContext;
-import com.alexaf.gitlabmcp.port.FailureAnalyzer;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
+import java.io.StringReader;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+
 import org.w3c.dom.Element;
 import org.w3c.dom.Node;
 import org.w3c.dom.NodeList;
@@ -15,13 +16,15 @@ import org.xml.sax.InputSource;
 import org.xml.sax.SAXParseException;
 import org.xml.sax.helpers.DefaultHandler;
 
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilderFactory;
-import java.io.StringReader;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import com.alexaf.gitlabmcp.domain.Confidence;
+import com.alexaf.gitlabmcp.domain.Evidence;
+import com.alexaf.gitlabmcp.domain.Finding;
+import com.alexaf.gitlabmcp.domain.FindingCategory;
+import com.alexaf.gitlabmcp.domain.PipelineContext;
+import com.alexaf.gitlabmcp.port.FailureAnalyzer;
 
 @Component
 public class JunitXmlFailureAnalyzer implements FailureAnalyzer {
@@ -91,9 +94,8 @@ public class JunitXmlFailureAnalyzer implements FailureAnalyzer {
                 throw exception;
             }
         });
-        Element root = documentBuilder
-                .parse(new InputSource(new StringReader(xml)))
-                .getDocumentElement();
+        Element root =
+                documentBuilder.parse(new InputSource(new StringReader(xml))).getDocumentElement();
         NodeList testCases = root.getElementsByTagName("testcase");
         for (int index = 0; index < testCases.getLength() && findings.size() < MAX_FINDINGS; index++) {
             Element testCase = (Element) testCases.item(index);
@@ -108,9 +110,7 @@ public class JunitXmlFailureAnalyzer implements FailureAnalyzer {
     private Finding finding(String path, Element testCase, Element failure) {
         String className = testCase.getAttribute("classname");
         String testName = testCase.getAttribute("name");
-        String qualifiedName = StringUtils.hasText(className)
-                ? className + "#" + testName
-                : testName;
+        String qualifiedName = StringUtils.hasText(className) ? className + "#" + testName : testName;
         String type = failure.getAttribute("type");
         String message = failure.getAttribute("message");
         String details = compact(failure.getTextContent());

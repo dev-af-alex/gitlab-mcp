@@ -6,8 +6,8 @@ import java.util.regex.Pattern;
 public record GitlabVersion(int major, int minor, int patch, String edition, String raw)
         implements Comparable<GitlabVersion> {
 
-    private static final Pattern VERSION_PATTERN = Pattern.compile(
-            "^(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+.]?([A-Za-z][A-Za-z0-9.-]*))?.*$");
+    private static final Pattern VERSION_PATTERN =
+            Pattern.compile("^(\\d+)\\.(\\d+)\\.(\\d+)(?:[-+.]?([A-Za-z][A-Za-z0-9.-]*))?.*$");
 
     public static GitlabVersion parse(String value) {
         if (value == null || value.isBlank()) {

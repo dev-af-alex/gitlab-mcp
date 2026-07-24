@@ -1,5 +1,18 @@
 package com.alexaf.gitlabmcp.application.pipeline;
 
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Locale;
+import java.util.Map;
+import java.util.Set;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
 import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
@@ -16,18 +29,6 @@ import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
 import com.alexaf.gitlabmcp.port.PipelineContextCollector;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-
-import java.util.ArrayDeque;
-import java.util.ArrayList;
-import java.util.HashSet;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
-import java.util.Set;
 
 @Component
 public class DefaultPipelineContextCollector implements PipelineContextCollector {
@@ -46,12 +47,7 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
         this(gitlab, maxJobs, 20, 3);
     }
 
-    public DefaultPipelineContextCollector(
-            GitlabGateway gitlab,
-            int maxJobs,
-            int maxPipelines,
-            int maxPipelineDepth
-    ) {
+    public DefaultPipelineContextCollector(GitlabGateway gitlab, int maxJobs, int maxPipelines, int maxPipelineDepth) {
         this.gitlab = gitlab;
         this.maxJobs = Math.max(1, maxJobs);
         this.maxPipelines = Math.max(1, maxPipelines);
@@ -60,15 +56,9 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
 
     @Override
     public PipelineContext collect(
-            String projectId,
-            String pipelineId,
-            String mergeRequestIid,
-            PipelineCollectionOptions options
-    ) {
+            String projectId, String pipelineId, String mergeRequestIid, PipelineCollectionOptions options) {
         Pipeline pipeline = resolvePipeline(projectId, pipelineId, mergeRequestIid);
-        String rootJobsPipelineId = StringUtils.hasText(pipelineId)
-                ? pipelineId
-                : String.valueOf(pipeline.id());
+        String rootJobsPipelineId = StringUtils.hasText(pipelineId) ? pipelineId : String.valueOf(pipeline.id());
         PipelineGraph graph = collectGraph(projectId, pipeline);
         List<Job> jobs = new ArrayList<>();
         Map<Long, String> jobProjects = new LinkedHashMap<>();
@@ -83,19 +73,13 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             String jobsPipelineId = node.depth() == 0
                     ? rootJobsPipelineId
                     : String.valueOf(node.pipeline().id());
-            GitlabPage<Job> page = gitlab.getPipelineJobs(
-                    node.projectId(),
-                    jobsPipelineId,
-                    false,
-                    remainingJobs);
+            GitlabPage<Job> page = gitlab.getPipelineJobs(node.projectId(), jobsPipelineId, false, remainingJobs);
             jobs.addAll(page.items());
             page.items().forEach(job -> jobProjects.put(job.id(), node.projectId()));
             totalJobsFetched += page.totalFetched();
             jobsTruncated |= page.truncated();
         }
-        var testReport = gitlab.getPipelineTestReport(
-                projectId,
-                String.valueOf(pipeline.id()));
+        var testReport = gitlab.getPipelineTestReport(projectId, String.valueOf(pipeline.id()));
         Map<Long, String> traces = new LinkedHashMap<>();
         Map<Long, List<ArtifactFile>> artifacts = new LinkedHashMap<>();
         Map<String, String> junitReports = new LinkedHashMap<>();
@@ -126,13 +110,9 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             List<Job> jobs,
             Map<Long, String> traces,
             Map<Long, List<ArtifactFile>> artifacts,
-            Map<String, String> junitReports
-    ) {
+            Map<String, String> junitReports) {
         StringBuilder source = new StringBuilder();
-        jobs.forEach(job -> source.append(' ')
-                .append(job.name())
-                .append(' ')
-                .append(job.stage()));
+        jobs.forEach(job -> source.append(' ').append(job.name()).append(' ').append(job.stage()));
         traces.values().forEach(trace -> source.append(' ').append(trace));
         artifacts.values().stream()
                 .flatMap(List::stream)
@@ -164,7 +144,7 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
         }
     }
 
-    private PipelineGraph collectGraph(String projectId, Pipeline root) {
+    private PipelineGraph collectGraph(String projectId, Pipeline root) { // NOPMD - existing complexity baseline
         List<PipelineNode> nodes = new ArrayList<>();
         List<PipelineEdge> edges = new ArrayList<>();
         ArrayDeque<PipelineNode> queue = new ArrayDeque<>();
@@ -180,9 +160,7 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             GitlabPage<PipelineBridge> bridges;
             try {
                 bridges = gitlab.getPipelineBridges(
-                        current.projectId(),
-                        String.valueOf(current.pipeline().id()),
-                        Math.max(1, remainingCapacity));
+                        current.projectId(), String.valueOf(current.pipeline().id()), Math.max(1, remainingCapacity));
             } catch (GitlabNotFoundException unavailable) {
                 continue;
             }
@@ -195,9 +173,8 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
                 if (downstream == null || downstream.id() == null) {
                     continue;
                 }
-                String downstreamProjectId = downstream.projectId() == null
-                        ? current.projectId()
-                        : String.valueOf(downstream.projectId());
+                String downstreamProjectId =
+                        downstream.projectId() == null ? current.projectId() : String.valueOf(downstream.projectId());
                 edges.add(new PipelineEdge(
                         current.projectId(),
                         current.pipeline().id(),
@@ -213,10 +190,7 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
                     truncated = true;
                     continue;
                 }
-                PipelineNode child = new PipelineNode(
-                        downstreamProjectId,
-                        downstream,
-                        current.depth() + 1);
+                PipelineNode child = new PipelineNode(downstreamProjectId, downstream, current.depth() + 1);
                 seen.add(key);
                 nodes.add(child);
                 queue.addLast(child);
@@ -234,16 +208,14 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             Job job,
             PipelineCollectionOptions options,
             Map<Long, String> traces,
-            List<String> warnings
-    ) {
+            List<String> warnings) {
         if (!options.includeTraces()) {
             return;
         }
         try {
-            traces.put(job.id(), gitlab.getJobTraceTail(
-                    projectId,
-                    String.valueOf(job.id()),
-                    Math.max(1, options.maxTraceBytes())));
+            traces.put(
+                    job.id(),
+                    gitlab.getJobTraceTail(projectId, String.valueOf(job.id()), Math.max(1, options.maxTraceBytes())));
         } catch (GitlabDownloadLimitException tooLarge) {
             addDownloadWarning(warnings, "job " + job.id() + " trace", tooLarge);
         }
@@ -255,8 +227,7 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             PipelineCollectionOptions options,
             Map<Long, List<ArtifactFile>> artifacts,
             Map<String, String> junitReports,
-            List<String> warnings
-    ) {
+            List<String> warnings) {
         if (!options.includeArtifacts()) {
             return;
         }
@@ -276,17 +247,13 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
         }
         artifacts.put(job.id(), files);
         for (ArtifactFile file : files) {
-            if (junitReports.size() >= Math.max(1, options.maxJunitReports())
-                    || !isJunitReport(file.path())) {
+            if (junitReports.size() >= Math.max(1, options.maxJunitReports()) || !isJunitReport(file.path())) {
                 continue;
             }
             String content;
             try {
                 content = gitlab.getJobArtifactFile(
-                        projectId,
-                        String.valueOf(job.id()),
-                        file.path(),
-                        Math.max(1, options.maxReportBytes()));
+                        projectId, String.valueOf(job.id()), file.path(), Math.max(1, options.maxReportBytes()));
             } catch (GitlabDownloadLimitException tooLarge) {
                 addDownloadWarning(warnings, "artifact report " + file.path(), tooLarge);
                 continue;
@@ -297,11 +264,7 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
         }
     }
 
-    private void addDownloadWarning(
-            List<String> warnings,
-            String evidence,
-            GitlabDownloadLimitException exception
-    ) {
+    private void addDownloadWarning(List<String> warnings, String evidence, GitlabDownloadLimitException exception) {
         String warning = "Skipped " + evidence + " because it exceeds the configured download limit of "
                 + exception.maxBytes() + " bytes.";
         if (!warnings.contains(warning)) {
@@ -317,11 +280,11 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
         String fileName = normalized.substring(normalized.lastIndexOf('/') + 1);
         return normalized.endsWith(".xml")
                 && (fileName.startsWith("test-")
-                || normalized.contains("junit")
-                || normalized.contains("surefire-reports")
-                || normalized.contains("test-results")
-                || normalized.contains("pytest")
-                || normalized.contains("jest"));
+                        || normalized.contains("junit")
+                        || normalized.contains("surefire-reports")
+                        || normalized.contains("test-results")
+                        || normalized.contains("pytest")
+                        || normalized.contains("jest"));
     }
 
     private Pipeline resolvePipeline(String projectId, String pipelineId, String mergeRequestIid) {
@@ -329,17 +292,14 @@ public class DefaultPipelineContextCollector implements PipelineContextCollector
             return gitlab.getPipeline(projectId, pipelineId);
         }
         if (StringUtils.hasText(mergeRequestIid)) {
-            List<Pipeline> pipelines = gitlab.listMergeRequestPipelines(
-                    projectId,
-                    mergeRequestIid,
-                    new GitlabPageRequest(1, 20));
+            List<Pipeline> pipelines =
+                    gitlab.listMergeRequestPipelines(projectId, mergeRequestIid, new GitlabPageRequest(1, 20));
             return pipelines.stream()
-                    .filter(pipeline -> "failed".equals(pipeline.status())
-                            || "canceled".equals(pipeline.status()))
+                    .filter(pipeline -> "failed".equals(pipeline.status()) || "canceled".equals(pipeline.status()))
                     .findFirst()
                     .or(() -> pipelines.stream().findFirst())
-                    .orElseThrow(() -> new IllegalArgumentException(
-                            "No pipelines found for merge request: " + mergeRequestIid));
+                    .orElseThrow(() ->
+                            new IllegalArgumentException("No pipelines found for merge request: " + mergeRequestIid));
         }
         throw new IllegalArgumentException("Either pipelineId or mergeRequestIid must be set");
     }

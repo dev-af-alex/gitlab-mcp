@@ -1,12 +1,13 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
-import com.alexaf.gitlabmcp.application.JsonResponseWriter;
-import com.alexaf.gitlabmcp.port.GitlabGateway;
+import java.net.URLDecoder;
+import java.nio.charset.StandardCharsets;
+
 import org.springframework.ai.mcp.annotation.McpResource;
 import org.springframework.stereotype.Component;
 
-import java.net.URLDecoder;
-import java.nio.charset.StandardCharsets;
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 
 @Component
 public class GitlabResources {
@@ -39,8 +40,7 @@ public class GitlabResources {
             name = "gitlab_job_trace",
             title = "GitLab job trace",
             uri = "gitlab://projects/{projectId}/jobs/{jobId}/trace",
-            description = "Read a redacted GitLab job trace. projectId must be a numeric id or URL-encoded path."
-    )
+            description = "Read a redacted GitLab job trace. projectId must be a numeric id or URL-encoded path.")
     public String jobTrace(String projectId, String jobId) {
         return gitlab.getJobTraceTail(decode(projectId), jobId, DEFAULT_RESOURCE_BYTES);
     }
@@ -49,13 +49,9 @@ public class GitlabResources {
             name = "gitlab_job_artifact_file",
             title = "GitLab job artifact file",
             uri = "gitlab://projects/{projectId}/jobs/{jobId}/artifacts/{artifactPath}",
-            description = "Read one redacted text file from GitLab job artifacts. projectId and artifactPath must be URL-encoded when they contain slashes."
-    )
+            description =
+                    "Read one redacted text file from GitLab job artifacts. projectId and artifactPath must be URL-encoded when they contain slashes.")
     public String jobArtifactFile(String projectId, String jobId, String artifactPath) {
-        return gitlab.getJobArtifactFile(
-                decode(projectId),
-                jobId,
-                decode(artifactPath),
-                DEFAULT_RESOURCE_BYTES);
+        return gitlab.getJobArtifactFile(decode(projectId), jobId, decode(artifactPath), DEFAULT_RESOURCE_BYTES);
     }
 }

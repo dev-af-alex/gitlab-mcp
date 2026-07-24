@@ -1,28 +1,29 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
-import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import java.util.List;
+import java.util.Optional;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+
 import com.alexaf.gitlabmcp.domain.GitlabPage;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
 import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.Commit;
 import com.alexaf.gitlabmcp.gitlab.dto.CurrentUser;
 import com.alexaf.gitlabmcp.gitlab.dto.Discussion;
-import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
+import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-
-import java.util.List;
-import java.util.Optional;
 
 @Component
 public class RestGitlabGateway implements GitlabGateway {
@@ -37,8 +38,7 @@ public class RestGitlabGateway implements GitlabGateway {
             GitlabApiClient gitlab,
             GitlabServerInfoProvider serverInfoProvider,
             MergeRequestDiffProvider mergeRequestDiffProvider,
-            ArtifactIndexProvider artifactIndexProvider
-    ) {
+            ArtifactIndexProvider artifactIndexProvider) {
         this.gitlab = gitlab;
         this.serverInfoProvider = serverInfoProvider;
         this.mergeRequestDiffProvider = mergeRequestDiffProvider;
@@ -66,7 +66,9 @@ public class RestGitlabGateway implements GitlabGateway {
 
     @Override
     public List<Project> searchProjects(String search, GitlabPageRequest page) {
-        return gitlab.getList("/projects", Project.class,
+        return gitlab.getList(
+                "/projects",
+                Project.class,
                 gitlab.param("search", search),
                 gitlab.param("membership", true),
                 gitlab.param("page", page(page)),
@@ -80,7 +82,9 @@ public class RestGitlabGateway implements GitlabGateway {
 
     @Override
     public List<MergeRequest> listMergeRequests(String projectId, MergeRequestQuery query) {
-        return gitlab.getList(projectApi(projectId) + "/merge_requests", MergeRequest.class,
+        return gitlab.getList(
+                projectApi(projectId) + "/merge_requests",
+                MergeRequest.class,
                 gitlab.param("state", gitlab.mergeRequestState(query.state())),
                 gitlab.param("search", query.search()),
                 gitlab.param("source_branch", query.sourceBranch()),
@@ -104,34 +108,29 @@ public class RestGitlabGateway implements GitlabGateway {
     }
 
     @Override
-    public List<Commit> listMergeRequestCommits(
-            String projectId,
-            String mergeRequestIid,
-            GitlabPageRequest page
-    ) {
-        return gitlab.getList(mergeRequestApi(projectId, mergeRequestIid) + "/commits", Commit.class,
+    public List<Commit> listMergeRequestCommits(String projectId, String mergeRequestIid, GitlabPageRequest page) {
+        return gitlab.getList(
+                mergeRequestApi(projectId, mergeRequestIid) + "/commits",
+                Commit.class,
                 gitlab.param("page", page(page)),
                 gitlab.param("per_page", perPage(page)));
     }
 
     @Override
     public List<Discussion> listMergeRequestDiscussions(
-            String projectId,
-            String mergeRequestIid,
-            GitlabPageRequest page
-    ) {
-        return gitlab.getList(mergeRequestApi(projectId, mergeRequestIid) + "/discussions", Discussion.class,
+            String projectId, String mergeRequestIid, GitlabPageRequest page) {
+        return gitlab.getList(
+                mergeRequestApi(projectId, mergeRequestIid) + "/discussions",
+                Discussion.class,
                 gitlab.param("page", page(page)),
                 gitlab.param("per_page", perPage(page)));
     }
 
     @Override
-    public List<Pipeline> listMergeRequestPipelines(
-            String projectId,
-            String mergeRequestIid,
-            GitlabPageRequest page
-    ) {
-        return gitlab.getList(mergeRequestApi(projectId, mergeRequestIid) + "/pipelines", Pipeline.class,
+    public List<Pipeline> listMergeRequestPipelines(String projectId, String mergeRequestIid, GitlabPageRequest page) {
+        return gitlab.getList(
+                mergeRequestApi(projectId, mergeRequestIid) + "/pipelines",
+                Pipeline.class,
                 gitlab.param("page", page(page)),
                 gitlab.param("per_page", perPage(page)));
     }
@@ -144,25 +143,18 @@ public class RestGitlabGateway implements GitlabGateway {
 
     @Override
     public List<Job> listPipelineJobs(
-            String projectId,
-            String pipelineId,
-            Boolean includeRetried,
-            GitlabPageRequest page
-    ) {
+            String projectId, String pipelineId, Boolean includeRetried, GitlabPageRequest page) {
         long id = gitlab.pipelineId(pipelineId);
-        return gitlab.getList(projectApi(projectId) + "/pipelines/" + id + "/jobs", Job.class,
+        return gitlab.getList(
+                projectApi(projectId) + "/pipelines/" + id + "/jobs",
+                Job.class,
                 gitlab.param("include_retried", includeRetried),
                 gitlab.param("page", page(page)),
                 gitlab.param("per_page", perPage(page)));
     }
 
     @Override
-    public GitlabPage<Job> getPipelineJobs(
-            String projectId,
-            String pipelineId,
-            Boolean includeRetried,
-            int maxJobs
-    ) {
+    public GitlabPage<Job> getPipelineJobs(String projectId, String pipelineId, Boolean includeRetried, int maxJobs) {
         long id = gitlab.pipelineId(pipelineId);
         return gitlab.getAllPages(
                 projectApi(projectId) + "/pipelines/" + id + "/jobs",
@@ -174,11 +166,7 @@ public class RestGitlabGateway implements GitlabGateway {
     }
 
     @Override
-    public GitlabPage<PipelineBridge> getPipelineBridges(
-            String projectId,
-            String pipelineId,
-            int maxBridges
-    ) {
+    public GitlabPage<PipelineBridge> getPipelineBridges(String projectId, String pipelineId, int maxBridges) {
         long id = gitlab.pipelineId(pipelineId);
         return gitlab.getAllPages(
                 projectApi(projectId) + "/pipelines/" + id + "/bridges",
@@ -189,15 +177,11 @@ public class RestGitlabGateway implements GitlabGateway {
     }
 
     @Override
-    public Optional<GitlabTestReport> getPipelineTestReport(
-            String projectId,
-            String pipelineId
-    ) {
+    public Optional<GitlabTestReport> getPipelineTestReport(String projectId, String pipelineId) {
         long id = gitlab.pipelineId(pipelineId);
         try {
             return Optional.ofNullable(gitlab.getObject(
-                    projectApi(projectId) + "/pipelines/" + id + "/test_report",
-                    GitlabTestReport.class));
+                    projectApi(projectId) + "/pipelines/" + id + "/test_report", GitlabTestReport.class));
         } catch (GitlabNotFoundException reportUnavailable) {
             return Optional.empty();
         }
@@ -217,58 +201,30 @@ public class RestGitlabGateway implements GitlabGateway {
 
     @Override
     public List<ArtifactFile> listJobArtifacts(
-            String projectId,
-            String jobId,
-            String path,
-            Boolean recursive,
-            GitlabPageRequest page
-    ) {
+            String projectId, String jobId, String path, Boolean recursive, GitlabPageRequest page) {
         long id = gitlab.jobId(jobId);
-        return artifactIndexProvider.list(
-                projectApi(projectId) + "/jobs/" + id,
-                path,
-                recursive,
-                page);
+        return artifactIndexProvider.list(projectApi(projectId) + "/jobs/" + id, path, recursive, page);
     }
 
     @Override
     public List<ArtifactFile> findJobArtifactFiles(
-            String projectId,
-            String jobId,
-            String pattern,
-            Boolean regex,
-            GitlabPageRequest page
-    ) {
+            String projectId, String jobId, String pattern, Boolean regex, GitlabPageRequest page) {
         long id = gitlab.jobId(jobId);
-        return artifactIndexProvider.find(
-                projectApi(projectId) + "/jobs/" + id,
-                pattern,
-                regex,
-                page);
+        return artifactIndexProvider.find(projectApi(projectId) + "/jobs/" + id, pattern, regex, page);
     }
 
     @Override
-    public String getJobArtifactFile(
-            String projectId,
-            String jobId,
-            String artifactPath,
-            Integer maxBytes
-    ) {
+    public String getJobArtifactFile(String projectId, String jobId, String artifactPath, Integer maxBytes) {
         long id = gitlab.jobId(jobId);
-        return gitlab.getLimitedText(projectApi(projectId) + "/jobs/" + id + "/artifacts/"
-                + normalizeArtifactPath(artifactPath), maxBytes);
+        return gitlab.getLimitedText(
+                projectApi(projectId) + "/jobs/" + id + "/artifacts/" + normalizeArtifactPath(artifactPath), maxBytes);
     }
 
     @Override
-    public String getJobArtifactFileTail(
-            String projectId,
-            String jobId,
-            String artifactPath,
-            Integer maxBytes
-    ) {
+    public String getJobArtifactFileTail(String projectId, String jobId, String artifactPath, Integer maxBytes) {
         long id = gitlab.jobId(jobId);
-        return gitlab.getTailText(projectApi(projectId) + "/jobs/" + id + "/artifacts/"
-                + normalizeArtifactPath(artifactPath), maxBytes);
+        return gitlab.getTailText(
+                projectApi(projectId) + "/jobs/" + id + "/artifacts/" + normalizeArtifactPath(artifactPath), maxBytes);
     }
 
     private String projectApi(String projectId) {

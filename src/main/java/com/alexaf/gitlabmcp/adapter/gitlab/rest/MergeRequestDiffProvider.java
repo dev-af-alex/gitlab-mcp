@@ -1,14 +1,15 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
 import com.alexaf.gitlabmcp.domain.GitlabCapability;
 import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
 import com.alexaf.gitlabmcp.gitlab.dto.FileChange;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
-import org.springframework.stereotype.Component;
-
-import java.util.List;
 
 @Component
 public class MergeRequestDiffProvider {
@@ -18,10 +19,7 @@ public class MergeRequestDiffProvider {
     private final GitlabApiClient gitlab;
     private final GitlabServerInfoProvider serverInfoProvider;
 
-    public MergeRequestDiffProvider(
-            GitlabApiClient gitlab,
-            GitlabServerInfoProvider serverInfoProvider
-    ) {
+    public MergeRequestDiffProvider(GitlabApiClient gitlab, GitlabServerInfoProvider serverInfoProvider) {
         this.gitlab = gitlab;
         this.serverInfoProvider = serverInfoProvider;
     }
@@ -32,11 +30,12 @@ public class MergeRequestDiffProvider {
         }
         try {
             List<FileChange> diffs = gitlab.getAllPages(
-                    mergeRequestApi + "/diffs",
-                    FileChange.class,
-                    MAX_DIFF_FILES,
-                    gitlab.param("page", 1),
-                    gitlab.param("per_page", 100)).items();
+                            mergeRequestApi + "/diffs",
+                            FileChange.class,
+                            MAX_DIFF_FILES,
+                            gitlab.param("page", 1),
+                            gitlab.param("per_page", 100))
+                    .items();
             MergeRequest mergeRequest = gitlab.getObject(mergeRequestApi, MergeRequest.class);
             return changes(mergeRequest, diffs);
         } catch (GitlabNotFoundException unsupportedEndpoint) {

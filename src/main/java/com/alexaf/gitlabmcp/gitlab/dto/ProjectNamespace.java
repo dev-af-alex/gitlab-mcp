@@ -10,6 +10,4 @@ public record ProjectNamespace(
         String path,
         String kind,
         @JsonProperty("full_path") String fullPath,
-        @JsonProperty("web_url") String webUrl
-) {
-}
+        @JsonProperty("web_url") String webUrl) {}

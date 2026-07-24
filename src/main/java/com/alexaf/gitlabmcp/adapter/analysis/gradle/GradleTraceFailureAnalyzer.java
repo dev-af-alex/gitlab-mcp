@@ -1,9 +1,10 @@
 package com.alexaf.gitlabmcp.adapter.analysis.gradle;
 
-import com.alexaf.gitlabmcp.adapter.analysis.TracePatternFailureAnalyzer;
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import com.alexaf.gitlabmcp.adapter.analysis.TracePatternFailureAnalyzer;
 
 @Component
 public class GradleTraceFailureAnalyzer extends TracePatternFailureAnalyzer {

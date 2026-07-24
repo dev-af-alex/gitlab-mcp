@@ -96,6 +96,24 @@ Build and test:
 ./mvnw clean verify
 ```
 
+The build checks Java formatting with Spotless and runs PMD static analysis. Apply the project format locally with:
+
+```bash
+./mvnw spotless:apply
+```
+
+To check formatting without changing files:
+
+```bash
+./mvnw spotless:check
+```
+
+Run the Java linter separately with:
+
+```bash
+./mvnw pmd:check
+```
+
 Start the stdio server:
 
 ```bash

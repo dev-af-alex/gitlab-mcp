@@ -13,6 +13,4 @@ public record RunnerInfo(
         @JsonProperty("runner_type") String runnerType,
         String name,
         Boolean online,
-        String status
-) {
-}
+        String status) {}

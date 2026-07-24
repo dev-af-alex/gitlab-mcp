@@ -1,12 +1,13 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
-import com.alexaf.gitlabmcp.application.JsonResponseWriter;
-import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
-import com.alexaf.gitlabmcp.port.GitlabGateway;
 import org.springframework.ai.mcp.annotation.McpTool;
 import org.springframework.ai.mcp.annotation.McpTool.McpAnnotations;
 import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
+
+import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
 
 @Component
 public class GitlabProjectTools {
@@ -40,12 +41,10 @@ public class GitlabProjectTools {
             description = "Search visible GitLab projects. Read-only.",
             annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public String searchProjects(
-            @McpToolParam(description = "Search text, for example project name or path.")
-            String search,
-            @McpToolParam(description = "Page number, starting from 1.", required = false)
-            Integer page,
+            @McpToolParam(description = "Search text, for example project name or path.") String search,
+            @McpToolParam(description = "Page number, starting from 1.", required = false) Integer page,
             @McpToolParam(description = "Results per page. Capped by GITLAB_MAX_PER_PAGE.", required = false)
-            Integer perPage) {
+                    Integer perPage) {
         return responseWriter.write(gitlab.searchProjects(search, new GitlabPageRequest(page, perPage)));
     }
 
@@ -55,7 +54,7 @@ public class GitlabProjectTools {
             annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public String getProject(
             @McpToolParam(description = "Project id or full path, for example group/subgroup/project.")
-            String projectId) {
+                    String projectId) {
         return responseWriter.write(gitlab.getProject(projectId));
     }
 }

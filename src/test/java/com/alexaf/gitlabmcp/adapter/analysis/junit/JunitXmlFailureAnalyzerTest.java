@@ -1,12 +1,13 @@
 package com.alexaf.gitlabmcp.adapter.analysis.junit;
 
+import java.util.List;
+import java.util.Map;
+
+import org.junit.jupiter.api.Test;
+
 import com.alexaf.gitlabmcp.domain.Confidence;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
-import java.util.Map;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -31,15 +32,14 @@ class JunitXmlFailureAnalyzerTest {
                 """;
         PipelineContext context = context(Map.of("reports/jest-junit.xml", xml));
 
-        assertThat(analyzer.analyze(context)).singleElement()
-                .satisfies(finding -> {
-                    assertThat(finding.toolchain()).isEqualTo("jest");
-                    assertThat(finding.confidence()).isEqualTo(Confidence.HIGH);
-                    assertThat(finding.summary()).contains("Checkout API#returns 200");
-                    assertThat(finding.evidence())
-                            .extracting(evidence -> evidence.message())
-                            .anyMatch(message -> message.contains("received 500"));
-                });
+        assertThat(analyzer.analyze(context)).singleElement().satisfies(finding -> {
+            assertThat(finding.toolchain()).isEqualTo("jest");
+            assertThat(finding.confidence()).isEqualTo(Confidence.HIGH);
+            assertThat(finding.summary()).contains("Checkout API#returns 200");
+            assertThat(finding.evidence())
+                    .extracting(evidence -> evidence.message())
+                    .anyMatch(message -> message.contains("received 500"));
+        });
     }
 
     @Test
@@ -50,17 +50,15 @@ class JunitXmlFailureAnalyzerTest {
                 """;
         PipelineContext context = context(Map.of("report.xml", xml));
 
-        assertThat(analyzer.analyze(context)).singleElement()
-                .satisfies(finding -> {
-                    assertThat(finding.confidence()).isEqualTo(Confidence.LOW);
-                    assertThat(finding.summary()).contains("Unable to parse");
-                });
+        assertThat(analyzer.analyze(context)).singleElement().satisfies(finding -> {
+            assertThat(finding.confidence()).isEqualTo(Confidence.LOW);
+            assertThat(finding.summary()).contains("Unable to parse");
+        });
     }
 
     private PipelineContext context(Map<String, String> reports) {
-        Pipeline pipeline = new Pipeline(42L, 1L, 1L, "sha", "main", "failed", "push",
-                null, null, null, null, 1L, 1L, null);
-        return new PipelineContext(pipeline, List.of(), false, 0)
-                .withExecutionData(Map.of(), reports);
+        Pipeline pipeline =
+                new Pipeline(42L, 1L, 1L, "sha", "main", "failed", "push", null, null, null, null, 1L, 1L, null);
+        return new PipelineContext(pipeline, List.of(), false, 0).withExecutionData(Map.of(), reports);
     }
 }

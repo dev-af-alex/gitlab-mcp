@@ -1,9 +1,9 @@
 package com.alexaf.gitlabmcp.gitlab.dto;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record MergeRequest(
@@ -34,6 +34,4 @@ public record MergeRequest(
         @JsonProperty("blocking_discussions_resolved") Boolean blockingDiscussionsResolved,
         Pipeline pipeline,
         @JsonProperty("head_pipeline") Pipeline headPipeline,
-        @JsonProperty("diff_refs") DiffRefs diffRefs
-) {
-}
+        @JsonProperty("diff_refs") DiffRefs diffRefs) {}

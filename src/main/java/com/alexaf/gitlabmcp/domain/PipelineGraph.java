@@ -1,14 +1,10 @@
 package com.alexaf.gitlabmcp.domain;
 
-import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
-
 import java.util.List;
 
-public record PipelineGraph(
-        List<PipelineNode> nodes,
-        List<PipelineEdge> edges,
-        boolean truncated
-) {
+import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+
+public record PipelineGraph(List<PipelineNode> nodes, List<PipelineEdge> edges, boolean truncated) {
 
     public PipelineGraph {
         nodes = List.copyOf(nodes);

@@ -7,6 +7,4 @@ public record MergeRequestQuery(
         String targetBranch,
         String authorUsername,
         String reviewerUsername,
-        GitlabPageRequest page
-) {
-}
+        GitlabPageRequest page) {}

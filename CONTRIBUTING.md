@@ -65,11 +65,12 @@ section genuinely does not apply; do not leave template comments as the only con
 
 Before requesting review:
 
-1. Run `./mvnw clean verify`.
-2. Build the image with `docker build -t gitlab-mcp:latest .` when container behavior changes.
-3. Add a focused regression test for behavior changes.
-4. Update `README.md` and `docker-mcp/server.json` when exposed tools or their configuration change.
-5. Keep tests offline and mock GitLab HTTP interactions.
+1. Run `./mvnw spotless:apply`, then commit any formatting changes.
+2. Run `./mvnw clean verify`.
+3. Build the image with `docker build -t gitlab-mcp:latest .` when container behavior changes.
+4. Add a focused regression test for behavior changes.
+5. Update `README.md` and `docker-mcp/server.json` when exposed tools or their configuration change.
+6. Keep tests offline and mock GitLab HTTP interactions.
 
 CI validates the branch name, pull request title, required template sections, commit topology, Java builds, and the
 multi-platform Docker image.

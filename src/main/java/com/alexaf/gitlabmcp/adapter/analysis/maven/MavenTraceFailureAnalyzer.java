@@ -1,5 +1,11 @@
 package com.alexaf.gitlabmcp.adapter.analysis.maven;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+
+import org.springframework.stereotype.Component;
+
 import com.alexaf.gitlabmcp.domain.Confidence;
 import com.alexaf.gitlabmcp.domain.Evidence;
 import com.alexaf.gitlabmcp.domain.Finding;
@@ -8,11 +14,6 @@ import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.MavenFailureAnalyzer;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.MavenFailureSummary;
 import com.alexaf.gitlabmcp.port.FailureAnalyzer;
-import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
 
 @Component
 public class MavenTraceFailureAnalyzer implements FailureAnalyzer {
@@ -46,8 +47,7 @@ public class MavenTraceFailureAnalyzer implements FailureAnalyzer {
             if (!summary.mavenDetected()) {
                 return;
             }
-            FindingCategory category = summary.compilationFailureDetected()
-                    || summary.executionFailureDetected()
+            FindingCategory category = summary.compilationFailureDetected() || summary.executionFailureDetected()
                     ? FindingCategory.BUILD
                     : FindingCategory.TEST;
             List<Evidence> evidence = summary.evidence().stream()

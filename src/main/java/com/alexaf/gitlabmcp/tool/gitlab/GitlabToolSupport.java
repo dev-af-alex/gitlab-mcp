@@ -4,8 +4,7 @@ final class GitlabToolSupport {
 
     static final int DEFAULT_TRACE_BYTES = 60_000;
 
-    private GitlabToolSupport() {
-    }
+    private GitlabToolSupport() {}
 
     static int defaultMaxBytes(Integer maxBytes) {
         return maxBytes == null || maxBytes <= 0 ? DEFAULT_TRACE_BYTES : maxBytes;

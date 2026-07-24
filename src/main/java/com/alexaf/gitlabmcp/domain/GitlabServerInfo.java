@@ -9,8 +9,7 @@ public record GitlabServerInfo(
         String revision,
         Set<GitlabCapability> capabilities,
         GitlabVersion minimumSupportedVersion,
-        boolean supported
-) {
+        boolean supported) {
 
     public GitlabServerInfo {
         capabilities = capabilities.isEmpty()

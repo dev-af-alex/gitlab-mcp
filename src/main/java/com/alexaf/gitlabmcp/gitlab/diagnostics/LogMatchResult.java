@@ -8,8 +8,7 @@ public record LogMatchResult(
         int inspectedLines,
         int returnedMatches,
         boolean truncated,
-        List<LogMatch> matches
-) {
+        List<LogMatch> matches) {
 
     public LogMatchResult compact() {
         return new LogMatchResult(

@@ -8,6 +8,4 @@ public record JobArtifact(
         @JsonProperty("file_type") String fileType,
         Long size,
         String filename,
-        @JsonProperty("file_format") String fileFormat
-) {
-}
+        @JsonProperty("file_format") String fileFormat) {}

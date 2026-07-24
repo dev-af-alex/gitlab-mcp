@@ -1,9 +1,10 @@
 package com.alexaf.gitlabmcp.adapter.analysis.node;
 
-import com.alexaf.gitlabmcp.adapter.analysis.TracePatternFailureAnalyzer;
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import com.alexaf.gitlabmcp.adapter.analysis.TracePatternFailureAnalyzer;
 
 @Component
 public class JestTraceFailureAnalyzer extends TracePatternFailureAnalyzer {
@@ -13,11 +14,7 @@ public class JestTraceFailureAnalyzer extends TracePatternFailureAnalyzer {
                 "jest-trace",
                 "node",
                 170,
-                List.of(
-                        "^FAIL\\s+\\S+",
-                        "^\\s*●\\s+",
-                        "^Test Suites:.*failed",
-                        "^Tests:.*failed"),
+                List.of("^FAIL\\s+\\S+", "^\\s*●\\s+", "^Test Suites:.*failed", "^Tests:.*failed"),
                 "Inspect the failing Jest suite and compare expected and received values.");
     }
 }

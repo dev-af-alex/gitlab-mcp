@@ -1,23 +1,5 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
-import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
-import com.alexaf.gitlabmcp.domain.PipelineAnalysis;
-import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
-import com.alexaf.gitlabmcp.domain.PipelineContext;
-import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
-import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
-import com.alexaf.gitlabmcp.gitlab.dto.FileChange;
-import com.alexaf.gitlabmcp.gitlab.dto.Job;
-import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
-import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
-import com.alexaf.gitlabmcp.port.PipelineContextCollector;
-import com.alexaf.gitlabmcp.port.GitlabGateway;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Service;
-import org.springframework.util.StringUtils;
-
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -26,8 +8,27 @@ import java.util.Set;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+
+import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.domain.PipelineAnalysis;
+import com.alexaf.gitlabmcp.domain.PipelineCollectionOptions;
+import com.alexaf.gitlabmcp.domain.PipelineContext;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
+import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
+import com.alexaf.gitlabmcp.gitlab.dto.FileChange;
+import com.alexaf.gitlabmcp.gitlab.dto.Job;
+import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
+import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
+import com.alexaf.gitlabmcp.port.GitlabGateway;
+import com.alexaf.gitlabmcp.port.PipelineContextCollector;
+
 @Service
-public class PipelineDiagnosticsService {
+public class PipelineDiagnosticsService { // NOPMD - existing complexity baseline
 
     private static final int DEFAULT_MAX_TRACE_BYTES = 60_000;
     private static final int MAX_USEFUL_ARTIFACTS = 20;
@@ -97,8 +98,15 @@ public class PipelineDiagnosticsService {
             Integer maxTraceBytesPerJob,
             Boolean includeRawTraces,
             Boolean includeArtifactHints) {
-        return analyze(projectId, pipelineId, mergeRequestIid, includeTraces, maxTraceBytesPerJob,
-                includeRawTraces, includeArtifactHints, false);
+        return analyze(
+                projectId,
+                pipelineId,
+                mergeRequestIid,
+                includeTraces,
+                maxTraceBytesPerJob,
+                includeRawTraces,
+                includeArtifactHints,
+                false);
     }
 
     public PipelineDiagnosticsResult analyze(
@@ -108,15 +116,14 @@ public class PipelineDiagnosticsService {
             Boolean includeTraces,
             Integer maxTraceBytesPerJob,
             Boolean includeRawTraces,
-        Boolean includeArtifactHints,
-        Boolean includeDetails) {
+            Boolean includeArtifactHints,
+            Boolean includeDetails) {
         boolean tracesEnabled = includeTraces == null || includeTraces;
         boolean rawTracesEnabled = includeRawTraces != null && includeRawTraces;
         boolean artifactHintsEnabled = includeArtifactHints == null || includeArtifactHints;
         boolean detailsEnabled = includeDetails != null && includeDetails;
-        int maxTraceBytes = maxTraceBytesPerJob == null || maxTraceBytesPerJob <= 0
-                            ? DEFAULT_MAX_TRACE_BYTES
-                            : maxTraceBytesPerJob;
+        int maxTraceBytes =
+                maxTraceBytesPerJob == null || maxTraceBytesPerJob <= 0 ? DEFAULT_MAX_TRACE_BYTES : maxTraceBytesPerJob;
 
         PipelineCollectionOptions collectionOptions = new PipelineCollectionOptions(
                 tracesEnabled,
@@ -125,11 +132,7 @@ public class PipelineDiagnosticsService {
                 100,
                 MAX_SUREFIRE_REPORTS,
                 MAX_SUREFIRE_REPORT_BYTES);
-        PipelineContext context = contextCollector.collect(
-                        projectId,
-                        pipelineId,
-                        mergeRequestIid,
-                collectionOptions);
+        PipelineContext context = contextCollector.collect(projectId, pipelineId, mergeRequestIid, collectionOptions);
         Pipeline pipeline = context.pipeline();
         List<Job> jobs = context.jobs();
         List<JobDiagnostic> failedJobs = jobs.stream()
@@ -185,10 +188,7 @@ public class PipelineDiagnosticsService {
     }
 
     public JobFailureSummary extractJobFailureSummary(
-            String projectId,
-            String jobId,
-            Integer maxTraceBytes,
-            Boolean includeDetails) {
+            String projectId, String jobId, Integer maxTraceBytes, Boolean includeDetails) {
         Job job = gitlab.getJob(projectId, jobId);
         List<String> warnings = new ArrayList<>();
         String trace;
@@ -201,28 +201,25 @@ public class PipelineDiagnosticsService {
             addDownloadWarning(warnings, "job " + jobId + " trace", tooLarge);
             trace = null;
         }
-        return failureSummary(
-                projectId,
-                job,
-                trace,
-                includeDetails != null && includeDetails,
-                warnings);
+        return failureSummary(projectId, job, trace, includeDetails != null && includeDetails, warnings);
     }
 
     public List<SurefireReportInsight> analyzeJobSurefireReports(
-            String projectId,
-            String jobId,
-            String classNamePattern,
-            Integer maxReports) {
+            String projectId, String jobId, String classNamePattern, Integer maxReports) {
         int reportLimit = maxReports == null || maxReports <= 0 ? MAX_SUREFIRE_REPORTS : Math.min(maxReports, 20);
         List<String> warnings = new ArrayList<>();
         if (StringUtils.hasText(classNamePattern)) {
             String classPattern = Pattern.quote(classNamePattern.trim());
-            return analyzeSurefireReports(projectId, jobId, List.of(
-                    ".*" + classPattern + ".*\\.txt$",
-                    ".*TEST-.*" + classPattern + ".*\\.xml$"), reportLimit, warnings);
+            return analyzeSurefireReports(
+                    projectId,
+                    jobId,
+                    List.of(".*" + classPattern + ".*\\.txt$", ".*TEST-.*" + classPattern + ".*\\.xml$"),
+                    reportLimit,
+                    warnings);
         }
-        return analyzeSurefireReports(projectId, jobId,
+        return analyzeSurefireReports(
+                projectId,
+                jobId,
                 surefireReportPatterns(artifactMavenSummary(projectId, jobId, warnings)),
                 reportLimit,
                 warnings);
@@ -251,21 +248,15 @@ public class PipelineDiagnosticsService {
             Boolean includeRawTraces,
             Boolean includeDetails) {
         PipelineDiagnosticsResult pipelineDiagnostics = analyze(
-                projectId,
-                null,
-                mergeRequestIid,
-                true,
-                maxTraceBytesPerJob,
-                includeRawTraces,
-                true,
-                includeDetails);
+                projectId, null, mergeRequestIid, true, maxTraceBytesPerJob, includeRawTraces, true, includeDetails);
         MergeRequestChanges changes = gitlab.getMergeRequestChanges(projectId, mergeRequestIid);
         List<String> changedFiles = changes.changes() == null
-                                    ? List.of()
-                                    : changes.changes().stream().map(change -> change.newPath() != null ? change.newPath() : change.oldPath()).toList();
-        MergeRequestChanges responseChanges = includeDetails != null && includeDetails
-                                              ? changes
-                                              : compactChanges(changes);
+                ? List.of()
+                : changes.changes().stream()
+                        .map(change -> change.newPath() != null ? change.newPath() : change.oldPath())
+                        .toList();
+        MergeRequestChanges responseChanges =
+                includeDetails != null && includeDetails ? changes : compactChanges(changes);
         return new MrPipelineFailureAnalysis(
                 pipelineDiagnostics,
                 responseChanges,
@@ -298,34 +289,28 @@ public class PipelineDiagnosticsService {
                 includeDetails ? analysis.evidence() : compactLines(analysis.evidence(), 6),
                 failureSummary,
                 includeArtifactHints
-                ? (includeDetails
-                ? usefulArtifacts(projectId, job, knownArtifacts)
-                : usefulArtifacts(projectId, job, knownArtifacts).stream().limit(10).toList())
-                : List.of(),
+                        ? (includeDetails
+                                ? usefulArtifacts(projectId, job, knownArtifacts)
+                                : usefulArtifacts(projectId, job, knownArtifacts).stream()
+                                        .limit(10)
+                                        .toList())
+                        : List.of(),
                 includeRawTrace ? trace : null,
                 trace != null && trace.contains("[truncated to "),
                 analysis.nextSteps(),
                 job.runner());
     }
 
-    private List<String> usefulArtifacts(
-            String projectId,
-            Job job,
-            List<ArtifactFile> knownArtifacts
-    ) {
+    private List<String> usefulArtifacts(String projectId, Job job, List<ArtifactFile> knownArtifacts) {
         if (knownArtifacts != null) {
             return artifactHintDetector.usefulArtifacts(job, knownArtifacts).stream()
                     .limit(MAX_USEFUL_ARTIFACTS)
                     .toList();
         }
-        List<ArtifactFile> artifactFiles ;
+        List<ArtifactFile> artifactFiles;
         try {
             artifactFiles = gitlab.listJobArtifacts(
-                    projectId,
-                    String.valueOf(job.id()),
-                    null,
-                    true,
-                    new GitlabPageRequest(1, 100));
+                    projectId, String.valueOf(job.id()), null, true, new GitlabPageRequest(1, 100));
         } catch (GitlabNotFoundException ignored) {
             return artifactHintDetector.usefulArtifacts(job, List.of());
         } catch (GitlabDownloadLimitException ignored) {
@@ -341,20 +326,17 @@ public class PipelineDiagnosticsService {
     }
 
     private JobFailureSummary failureSummary(
-            String projectId,
-            Job job,
-            String trace,
-            boolean includeDetails,
-            List<String> warnings
-    ) {
+            String projectId, Job job, String trace, boolean includeDetails, List<String> warnings) {
         MavenFailureSummary maven = mavenFailureAnalyzer.analyze(trace);
-        maven = mavenFailureAnalyzer.merge(
-                maven,
-                artifactMavenSummary(projectId, String.valueOf(job.id()), warnings));
+        maven = mavenFailureAnalyzer.merge(maven, artifactMavenSummary(projectId, String.valueOf(job.id()), warnings));
         List<SurefireReportInsight> surefireReports = maven.testFailureDetected()
-                                                      ? analyzeSurefireReports(projectId, String.valueOf(job.id()),
-                surefireReportPatterns(maven), MAX_SUREFIRE_REPORTS, warnings)
-                                                      : List.of();
+                ? analyzeSurefireReports(
+                        projectId,
+                        String.valueOf(job.id()),
+                        surefireReportPatterns(maven),
+                        MAX_SUREFIRE_REPORTS,
+                        warnings)
+                : List.of();
         LogMatchResult importantTraceMatches = logMatcher.importantMatches(trace);
         RootCauseSummary primaryCause = primaryCause(maven, surefireReports, importantTraceMatches);
         JobFailureSummary result = new JobFailureSummary(
@@ -394,9 +376,7 @@ public class PipelineDiagnosticsService {
                 summary.warnings());
     }
 
-    private List<String> contextCascadeClasses(
-            MavenFailureSummary maven,
-            List<SurefireReportInsight> reports) {
+    private List<String> contextCascadeClasses(MavenFailureSummary maven, List<SurefireReportInsight> reports) {
         Set<String> result = new LinkedHashSet<>();
         maven.errorTests().stream()
                 .filter(MavenTestError::contextCascade)
@@ -427,7 +407,8 @@ public class PipelineDiagnosticsService {
     private List<String> compactLines(List<String> lines, int limit) {
         return lines.stream()
                 .map(line -> line.replaceAll("\\u001B\\[[;\\d]*m", "")
-                        .replaceAll("\\s+", " ").strip())
+                        .replaceAll("\\s+", " ")
+                        .strip())
                 .filter(StringUtils::hasText)
                 .distinct()
                 .limit(limit)
@@ -435,8 +416,9 @@ public class PipelineDiagnosticsService {
     }
 
     private List<String> likelyRelevantChangedFiles(List<String> changedFiles, List<JobDiagnostic> failedJobs) {
-        if (failedJobs.stream().anyMatch(job -> job.failureSummary().primaryCause() != null
-                && job.failureSummary().primaryCause().infrastructure())) {
+        if (failedJobs.stream()
+                .anyMatch(job -> job.failureSummary().primaryCause() != null
+                        && job.failureSummary().primaryCause().infrastructure())) {
             return List.of();
         }
         List<String> failureTokens = failedJobs.stream()
@@ -446,7 +428,8 @@ public class PipelineDiagnosticsService {
                 .distinct()
                 .toList();
         List<String> relevant = changedFiles.stream()
-                .filter(path -> failureTokens.stream().anyMatch(token -> path.toLowerCase(Locale.ROOT).contains(token)))
+                .filter(path -> failureTokens.stream()
+                        .anyMatch(token -> path.toLowerCase(Locale.ROOT).contains(token)))
                 .toList();
         return relevant;
     }
@@ -458,7 +441,8 @@ public class PipelineDiagnosticsService {
             if (primaryCause != null && primaryCause.infrastructure()) {
                 result.add("Retry the pipeline or move it to a healthy runner.");
                 result.add("Check Testcontainers/Ryuk image startup policy on CI.");
-                result.add("Do not start code changes until infra failure is reproduced locally or rerun fails the same way.");
+                result.add(
+                        "Do not start code changes until infra failure is reproduced locally or rerun fails the same way.");
                 return result;
             }
             if (job.failureSummary().maven().compilationFailureDetected()) {
@@ -477,12 +461,8 @@ public class PipelineDiagnosticsService {
         return result;
     }
 
-    private List<SurefireReportInsight> analyzeSurefireReports(
-            String projectId,
-            String jobId,
-            List<String> patterns,
-            int maxReports,
-            List<String> warnings) {
+    private List<SurefireReportInsight> analyzeSurefireReports( // NOPMD - existing complexity baseline
+            String projectId, String jobId, List<String> patterns, int maxReports, List<String> warnings) {
         List<SurefireReportInsight> result = new ArrayList<>();
         Set<String> seenPaths = new LinkedHashSet<>();
         Set<String> seenReportClasses = new LinkedHashSet<>();
@@ -493,11 +473,7 @@ public class PipelineDiagnosticsService {
             List<ArtifactFile> files;
             try {
                 files = gitlab.findJobArtifactFiles(
-                        projectId,
-                        jobId,
-                        pattern,
-                        true,
-                        new GitlabPageRequest(1, maxReports));
+                        projectId, jobId, pattern, true, new GitlabPageRequest(1, maxReports));
             } catch (GitlabNotFoundException ignored) {
                 continue;
             } catch (GitlabDownloadLimitException tooLarge) {
@@ -512,11 +488,7 @@ public class PipelineDiagnosticsService {
                 }
                 String text;
                 try {
-                    text = gitlab.getJobArtifactFile(
-                            projectId,
-                            jobId,
-                            file.path(),
-                            MAX_SUREFIRE_REPORT_BYTES);
+                    text = gitlab.getJobArtifactFile(projectId, jobId, file.path(), MAX_SUREFIRE_REPORT_BYTES);
                 } catch (GitlabDownloadLimitException tooLarge) {
                     addDownloadWarning(warnings, "Surefire report " + file.path(), tooLarge);
                     continue;
@@ -546,13 +518,13 @@ public class PipelineDiagnosticsService {
         return result;
     }
 
-    private RootCauseSummary primaryCause(
+    private RootCauseSummary primaryCause( // NOPMD - existing complexity baseline
             MavenFailureSummary maven,
             List<SurefireReportInsight> surefireReports,
             LogMatchResult importantTraceMatches) {
         if (maven.executionFailureDetected()) {
-            boolean runnerFailure = maven.evidence().stream().anyMatch(line -> line.contains("Process Exit Code: 137")
-                    || line.contains("forked VM terminated"));
+            boolean runnerFailure = maven.evidence().stream()
+                    .anyMatch(line -> line.contains("Process Exit Code: 137") || line.contains("forked VM terminated"));
             return new RootCauseSummary(
                     "maven_test_execution_failure",
                     null,
@@ -563,7 +535,9 @@ public class PipelineDiagnosticsService {
                             .findFirst()
                             .orElse(maven.detectedCause()),
                     runnerFailure,
-                    runnerFailure ? "retry_pipeline_or_reduce_parallel_test_forks" : "inspect_surefire_fork_configuration",
+                    runnerFailure
+                            ? "retry_pipeline_or_reduce_parallel_test_forks"
+                            : "inspect_surefire_fork_configuration",
                     "high",
                     maven.evidence());
         }
@@ -585,7 +559,9 @@ public class PipelineDiagnosticsService {
         SurefireReportInsight selected = surefireReports.stream()
                 .filter(report -> report.infrastructure() && !report.contextCascade())
                 .findFirst()
-                .or(() -> surefireReports.stream().filter(report -> !report.contextCascade()).findFirst())
+                .or(() -> surefireReports.stream()
+                        .filter(report -> !report.contextCascade())
+                        .findFirst())
                 .or(() -> surefireReports.stream().findFirst())
                 .orElse(null);
         if (selected != null) {
@@ -595,8 +571,8 @@ public class PipelineDiagnosticsService {
                     selected.rootCauseMessage(),
                     selected.infrastructure(),
                     selected.infrastructure()
-                    ? "retry_pipeline_or_fix_ci_runner"
-                    : "inspect_test_report_and_related_code",
+                            ? "retry_pipeline_or_fix_ci_runner"
+                            : "inspect_test_report_and_related_code",
                     selected.infrastructure() ? "high" : "medium",
                     selected.evidence());
         }
@@ -635,60 +611,47 @@ public class PipelineDiagnosticsService {
         return new RootCauseSummary(
                 "trace_failure",
                 null,
-                importantTraceMatches.matches().isEmpty() ? null : importantTraceMatches.matches().getFirst().text(),
+                importantTraceMatches.matches().isEmpty()
+                        ? null
+                        : importantTraceMatches.matches().getFirst().text(),
                 false,
                 "inspect_trace_matches",
                 "low",
-                importantTraceMatches.matches().stream().map(LogMatch::text).limit(10).toList());
+                importantTraceMatches.matches().stream()
+                        .map(LogMatch::text)
+                        .limit(10)
+                        .toList());
     }
 
     private List<String> failureTokens(JobFailureSummary summary) {
         List<String> result = new ArrayList<>();
         mavenFailureAnalyzer.failedClassNames(summary.maven()).stream()
-                .flatMap(className -> Stream.of(
-                        simpleName(className).replace("Test", ""),
-                        packagePath(className)))
+                .flatMap(className -> Stream.of(simpleName(className).replace("Test", ""), packagePath(className)))
                 .forEach(result::add);
         summary.surefireReports().stream()
                 .map(SurefireReportInsight::className)
                 .filter(StringUtils::hasText)
-                .flatMap(className -> Stream.of(
-                        simpleName(className).replace("Test", ""),
-                        packagePath(className)))
+                .flatMap(className -> Stream.of(simpleName(className).replace("Test", ""), packagePath(className)))
                 .forEach(result::add);
         return result;
     }
 
-    private MavenFailureSummary artifactMavenSummary(
-            String projectId,
-            String jobId,
-            List<String> warnings
-    ) {
+    private MavenFailureSummary artifactMavenSummary(String projectId, String jobId, List<String> warnings) {
         try {
-            List<ArtifactFile> logs = gitlab.findJobArtifactFiles(
-                    projectId,
-                    jobId,
-                    ".*\\.log$",
-                    true,
-                    new GitlabPageRequest(1, 3));
+            List<ArtifactFile> logs =
+                    gitlab.findJobArtifactFiles(projectId, jobId, ".*\\.log$", true, new GitlabPageRequest(1, 3));
             MavenFailureSummary result = null;
             for (ArtifactFile log : logs) {
                 String text;
                 try {
-                    text = gitlab.getJobArtifactFileTail(
-                            projectId,
-                            jobId,
-                            log.path(),
-                            DEFAULT_MAX_TRACE_BYTES);
+                    text = gitlab.getJobArtifactFileTail(projectId, jobId, log.path(), DEFAULT_MAX_TRACE_BYTES);
                 } catch (GitlabDownloadLimitException tooLarge) {
                     addDownloadWarning(warnings, "artifact log " + log.path(), tooLarge);
                     continue;
                 }
                 result = mavenFailureAnalyzer.merge(result, mavenFailureAnalyzer.analyze(text));
             }
-            return result == null
-                   ? noArtifactLog()
-                   : result;
+            return result == null ? noArtifactLog() : result;
         } catch (GitlabNotFoundException ignored) {
             return noArtifactLog();
         } catch (GitlabDownloadLimitException tooLarge) {
@@ -697,11 +660,7 @@ public class PipelineDiagnosticsService {
         }
     }
 
-    private void addDownloadWarning(
-            List<String> warnings,
-            String evidence,
-            GitlabDownloadLimitException exception
-    ) {
+    private void addDownloadWarning(List<String> warnings, String evidence, GitlabDownloadLimitException exception) {
         String warning = "Skipped " + evidence + " because it exceeds the configured download limit of "
                 + exception.maxBytes() + " bytes.";
         if (!warnings.contains(warning)) {
@@ -710,8 +669,20 @@ public class PipelineDiagnosticsService {
     }
 
     private MavenFailureSummary noArtifactLog() {
-        return new MavenFailureSummary(false, false, "No artifact log", "unknown",
-                null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of());
+        return new MavenFailureSummary(
+                false,
+                false,
+                "No artifact log",
+                "unknown",
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
     }
 
     private MergeRequestChanges compactChanges(MergeRequestChanges changes) {

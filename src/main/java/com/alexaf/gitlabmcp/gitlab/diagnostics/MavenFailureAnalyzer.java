@@ -1,8 +1,5 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
@@ -10,20 +7,23 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
 @Component
 public class MavenFailureAnalyzer {
 
     private static final Pattern TEST_COUNTS = Pattern.compile(
             "Tests run:\\s*(\\d+),\\s*Failures:\\s*(\\d+)(?:,\\s*Errors:\\s*(\\d+))?(?:,\\s*Skipped:\\s*(\\d+))?",
             Pattern.CASE_INSENSITIVE);
-    private static final Pattern FAILURE_LINE = Pattern.compile(
-            "\\[ERROR]\\s+([^\\s:]+)\\.([^\\s:]+):\\d+(?:->\\S+)?(?:\\s+(.*))?");
-    private static final Pattern FAILURE_LINE_WITHOUT_LINE_NUMBER = Pattern.compile(
-            "\\[ERROR]\\s+([^\\s:]+)\\.([^\\s:]+)(?:\\s+(.*))?");
-    private static final Pattern ERROR_LINE = Pattern.compile(
-            "\\[ERROR]\\s+([^\\s»]+)(?:\\.([^\\s»]+))?\\s+»\\s+([^\\s]+)\\s*(.*)");
-    private static final Pattern EXPECTED_ACTUAL = Pattern.compile(
-            "expected:\\s*<([^>]*)>\\s*but was:\\s*<([^>]*)>", Pattern.CASE_INSENSITIVE);
+    private static final Pattern FAILURE_LINE =
+            Pattern.compile("\\[ERROR]\\s+([^\\s:]+)\\.([^\\s:]+):\\d+(?:->\\S+)?(?:\\s+(.*))?");
+    private static final Pattern FAILURE_LINE_WITHOUT_LINE_NUMBER =
+            Pattern.compile("\\[ERROR]\\s+([^\\s:]+)\\.([^\\s:]+)(?:\\s+(.*))?");
+    private static final Pattern ERROR_LINE =
+            Pattern.compile("\\[ERROR]\\s+([^\\s»]+)(?:\\.([^\\s»]+))?\\s+»\\s+([^\\s]+)\\s*(.*)");
+    private static final Pattern EXPECTED_ACTUAL =
+            Pattern.compile("expected:\\s*<([^>]*)>\\s*but was:\\s*<([^>]*)>", Pattern.CASE_INSENSITIVE);
 
     private static boolean containsAny(String value, String... needles) {
         for (String needle : needles) {
@@ -50,7 +50,8 @@ public class MavenFailureAnalyzer {
             return empty();
         }
 
-        boolean mavenDetected = containsAny(trace, "[INFO] BUILD", "[ERROR]", "maven-surefire-plugin", "surefire-reports");
+        boolean mavenDetected =
+                containsAny(trace, "[INFO] BUILD", "[ERROR]", "maven-surefire-plugin", "surefire-reports");
         Counts counts = counts(trace);
         List<MavenTestFailure> failingTests = failingTests(trace);
         List<MavenTestError> errorTests = errorTests(trace);
@@ -64,9 +65,10 @@ public class MavenFailureAnalyzer {
                 || containsExecutionFailure(trace);
 
         String cause = containsExecutionFailure(trace)
-                       ? "Maven/Surefire test execution failure"
-                       : testFailureDetected ? "Maven/Surefire test failure"
-                                             : mavenDetected ? "Maven build failure" : "No Maven failure detected";
+                ? "Maven/Surefire test execution failure"
+                : testFailureDetected
+                        ? "Maven/Surefire test failure"
+                        : mavenDetected ? "Maven build failure" : "No Maven failure detected";
 
         return new MavenFailureSummary(
                 mavenDetected,
@@ -85,8 +87,20 @@ public class MavenFailureAnalyzer {
     }
 
     private MavenFailureSummary empty() {
-        return new MavenFailureSummary(false, false, "No trace", "unknown",
-                null, null, null, null, List.of(), List.of(), List.of(), List.of(), List.of());
+        return new MavenFailureSummary(
+                false,
+                false,
+                "No trace",
+                "unknown",
+                null,
+                null,
+                null,
+                null,
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of(),
+                List.of());
     }
 
     private Counts counts(String trace) {
@@ -137,7 +151,8 @@ public class MavenFailureAnalyzer {
         for (String line : trace.split("\\R")) {
             Matcher matcher = ERROR_LINE.matcher(line.strip());
             if (matcher.matches()) {
-                String message = matcher.group(4) == null ? "" : matcher.group(4).strip();
+                String message =
+                        matcher.group(4) == null ? "" : matcher.group(4).strip();
                 result.add(new MavenTestError(
                         matcher.group(1),
                         matcher.group(2),
@@ -149,11 +164,8 @@ public class MavenFailureAnalyzer {
         return result.stream().limit(20).toList();
     }
 
-    private List<String> evidence(
-            String trace,
-            Counts counts,
-            List<MavenTestFailure> failingTests,
-            List<MavenTestError> errorTests) {
+    private List<String> evidence( // NOPMD - existing complexity baseline
+            String trace, Counts counts, List<MavenTestFailure> failingTests, List<MavenTestError> errorTests) {
         List<String> evidence = new ArrayList<>();
         if (counts.testsRun() != null) {
             evidence.add("Tests run: " + counts.testsRun()
@@ -183,8 +195,7 @@ public class MavenFailureAnalyzer {
                     || stripped.contains("maven-compiler-plugin")
                     || stripped.startsWith("[ERROR]   symbol:")
                     || stripped.startsWith("[ERROR]   location:")
-                    || (compilationLocations < 5
-                    && stripped.matches("\\[ERROR] /.*\\.java:\\[?\\d+(,\\d+)?].*"))) {
+                    || (compilationLocations < 5 && stripped.matches("\\[ERROR] /.*\\.java:\\[?\\d+(,\\d+)?].*"))) {
                 evidence.add(stripped);
             }
             if (stripped.matches("\\[ERROR] /.*\\.java:\\[?\\d+(,\\d+)?].*")) {
@@ -243,9 +254,8 @@ public class MavenFailureAnalyzer {
         boolean testFailure = first.testFailureDetected() || second.testFailureDetected();
         boolean executionFailure = first.executionFailureDetected() || second.executionFailureDetected();
         String cause = executionFailure
-                       ? "Maven/Surefire test execution failure"
-                       : testFailure ? "Maven/Surefire test failure"
-                                     : "Maven build failure";
+                ? "Maven/Surefire test execution failure"
+                : testFailure ? "Maven/Surefire test failure" : "Maven build failure";
         return new MavenFailureSummary(
                 true,
                 testFailure,
@@ -279,13 +289,15 @@ public class MavenFailureAnalyzer {
     }
 
     private List<String> distinct(List<String> first, List<String> second, int limit) {
-        return java.util.stream.Stream.concat(first.stream(), second.stream()).distinct().limit(limit).toList();
+        return java.util.stream.Stream.concat(first.stream(), second.stream())
+                .distinct()
+                .limit(limit)
+                .toList();
     }
 
     private Integer prefer(Integer first, Integer second) {
         return first != null ? first : second;
     }
 
-    private record Counts(Integer testsRun, Integer failures, Integer errors, Integer skipped) {
-    }
+    private record Counts(Integer testsRun, Integer failures, Integer errors, Integer skipped) {}
 }

@@ -1,6 +1,7 @@
 package com.alexaf.gitlabmcp.application;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
+
 import org.springframework.stereotype.Component;
 
 @Component

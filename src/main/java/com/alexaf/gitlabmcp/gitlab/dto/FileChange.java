@@ -12,6 +12,4 @@ public record FileChange(
         @JsonProperty("new_file") Boolean newFile,
         @JsonProperty("renamed_file") Boolean renamedFile,
         @JsonProperty("deleted_file") Boolean deletedFile,
-        String diff
-) {
-}
+        String diff) {}

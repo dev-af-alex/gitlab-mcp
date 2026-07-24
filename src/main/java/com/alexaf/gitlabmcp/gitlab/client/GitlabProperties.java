@@ -1,10 +1,10 @@
 package com.alexaf.gitlabmcp.gitlab.client;
 
-import org.springframework.boot.context.properties.ConfigurationProperties;
-import org.springframework.boot.context.properties.bind.ConstructorBinding;
-
 import java.time.Duration;
 import java.util.List;
+
+import org.springframework.boot.context.properties.ConfigurationProperties;
+import org.springframework.boot.context.properties.bind.ConstructorBinding;
 
 @ConfigurationProperties(prefix = "gitlab")
 public record GitlabProperties(
@@ -24,20 +24,13 @@ public record GitlabProperties(
         String tempDirectory,
         long maxDownloadBytes,
         int retryAttempts,
-        Duration retryBackoff
-) {
+        Duration retryBackoff) {
 
     @ConstructorBinding
-    public GitlabProperties {
-    }
+    public GitlabProperties {}
 
     public GitlabProperties(
-            String url,
-            String token,
-            List<String> allowedProjects,
-            int defaultPerPage,
-            int maxPerPage
-    ) {
+            String url, String token, List<String> allowedProjects, int defaultPerPage, int maxPerPage) {
         this(
                 url,
                 token,
