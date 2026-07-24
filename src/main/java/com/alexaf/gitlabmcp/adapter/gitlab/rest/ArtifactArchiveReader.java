@@ -1,9 +1,5 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
-import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-
 import java.nio.file.Path;
 import java.util.Comparator;
 import java.util.List;
@@ -11,6 +7,11 @@ import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
+
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 
 @Component
 public class ArtifactArchiveReader {
@@ -47,11 +48,7 @@ public class ArtifactArchiveReader {
             return Optional.empty();
         }
         return Optional.of(new ArtifactFile(
-                fileName(entryName),
-                entryName,
-                "file",
-                entry.getSize() >= 0 ? entry.getSize() : null,
-                null));
+                fileName(entryName), entryName, "file", entry.getSize() >= 0 ? entry.getSize() : null, null));
     }
 
     private String normalizeDirectory(String path) {

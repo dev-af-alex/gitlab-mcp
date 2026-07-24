@@ -1,5 +1,11 @@
 package com.alexaf.gitlabmcp.adapter.analysis.junit;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
 import com.alexaf.gitlabmcp.domain.Confidence;
 import com.alexaf.gitlabmcp.domain.Evidence;
 import com.alexaf.gitlabmcp.domain.Finding;
@@ -9,11 +15,6 @@ import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestCase;
 import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
 import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestSuite;
 import com.alexaf.gitlabmcp.port.FailureAnalyzer;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Component
 public class GitlabTestReportAnalyzer implements FailureAnalyzer {
@@ -52,8 +53,8 @@ public class GitlabTestReportAnalyzer implements FailureAnalyzer {
                     FindingCategory.TEST,
                     "junit",
                     Confidence.HIGH,
-                    "GitLab reports " + positive(report.failedCount()) + " failed and "
-                            + positive(report.errorCount()) + " errored tests",
+                    "GitLab reports " + positive(report.failedCount()) + " failed and " + positive(report.errorCount())
+                            + " errored tests",
                     List.of(new Evidence(
                             "gitlab-test-report",
                             null,
@@ -70,25 +71,13 @@ public class GitlabTestReportAnalyzer implements FailureAnalyzer {
                 : testCase.name();
         List<Evidence> evidence = new ArrayList<>();
         if (StringUtils.hasText(testCase.systemOutput())) {
-            evidence.add(new Evidence(
-                    "gitlab-test-report",
-                    null,
-                    suite.name(),
-                    compact(testCase.systemOutput())));
+            evidence.add(new Evidence("gitlab-test-report", null, suite.name(), compact(testCase.systemOutput())));
         }
         if (StringUtils.hasText(testCase.stackTrace())) {
-            evidence.add(new Evidence(
-                    "gitlab-test-report",
-                    null,
-                    suite.name(),
-                    compact(testCase.stackTrace())));
+            evidence.add(new Evidence("gitlab-test-report", null, suite.name(), compact(testCase.stackTrace())));
         }
         if (evidence.isEmpty()) {
-            evidence.add(new Evidence(
-                    "gitlab-test-report",
-                    null,
-                    suite.name(),
-                    "status=" + testCase.status()));
+            evidence.add(new Evidence("gitlab-test-report", null, suite.name(), "status=" + testCase.status()));
         }
         return new Finding(
                 FindingCategory.TEST,
@@ -100,8 +89,7 @@ public class GitlabTestReportAnalyzer implements FailureAnalyzer {
     }
 
     private boolean isFailure(GitlabTestCase testCase) {
-        return "failed".equalsIgnoreCase(testCase.status())
-                || "error".equalsIgnoreCase(testCase.status());
+        return "failed".equalsIgnoreCase(testCase.status()) || "error".equalsIgnoreCase(testCase.status());
     }
 
     private int positive(Integer value) {

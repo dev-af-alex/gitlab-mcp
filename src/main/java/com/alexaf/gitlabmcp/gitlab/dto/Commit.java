@@ -14,6 +14,4 @@ public record Commit(
         @JsonProperty("authored_date") String authoredDate,
         @JsonProperty("committer_name") String committerName,
         @JsonProperty("committed_date") String committedDate,
-        @JsonProperty("web_url") String webUrl
-) {
-}
+        @JsonProperty("web_url") String webUrl) {}

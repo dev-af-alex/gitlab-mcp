@@ -13,6 +13,4 @@ public record CurrentUser(
         @JsonProperty("avatar_url") String avatarUrl,
         @JsonProperty("public_email") String publicEmail,
         String email,
-        @JsonProperty("last_activity_on") String lastActivityOn
-) {
-}
+        @JsonProperty("last_activity_on") String lastActivityOn) {}

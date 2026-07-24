@@ -8,8 +8,7 @@ public record Finding(
         Confidence confidence,
         String summary,
         List<Evidence> evidence,
-        List<String> recommendations
-) {
+        List<String> recommendations) {
 
     public Finding {
         evidence = List.copyOf(evidence);

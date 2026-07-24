@@ -1,5 +1,10 @@
 package com.alexaf.gitlabmcp.adapter.analysis.generic;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
 import com.alexaf.gitlabmcp.domain.Confidence;
 import com.alexaf.gitlabmcp.domain.Evidence;
 import com.alexaf.gitlabmcp.domain.Finding;
@@ -9,10 +14,6 @@ import com.alexaf.gitlabmcp.gitlab.diagnostics.TraceAnalysis;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.TraceAnalyzer;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.port.FailureAnalyzer;
-import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
-import java.util.List;
 
 @Component
 public class GenericTraceFailureAnalyzer implements FailureAnalyzer {

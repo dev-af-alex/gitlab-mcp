@@ -1,5 +1,26 @@
 package com.alexaf.gitlabmcp.gitlab.client;
 
+import java.io.ByteArrayOutputStream;
+import java.time.Duration;
+import java.util.List;
+import java.util.stream.Stream;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.Arguments;
+import org.junit.jupiter.params.provider.MethodSource;
+
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
+
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabApiException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabForbiddenException;
@@ -8,25 +29,6 @@ import com.alexaf.gitlabmcp.gitlab.client.error.GitlabRateLimitedException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabServerException;
 import com.alexaf.gitlabmcp.gitlab.client.error.GitlabUnauthorizedException;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.params.ParameterizedTest;
-import org.junit.jupiter.params.provider.Arguments;
-import org.junit.jupiter.params.provider.MethodSource;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.MediaType;
-import org.springframework.http.HttpStatus;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestClient;
-
-import java.io.ByteArrayOutputStream;
-import java.time.Duration;
-import java.util.List;
-import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -34,14 +36,13 @@ import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.header;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.method;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class GitlabApiClientTest {
 
-    private final ObjectMapper objectMapper = new ObjectMapper()
-            .findAndRegisterModules()
-            .enable(SerializationFeature.INDENT_OUTPUT);
+    private final ObjectMapper objectMapper =
+            new ObjectMapper().findAndRegisterModules().enable(SerializationFeature.INDENT_OUTPUT);
 
     private static Stream<Arguments> projectPathInputs() {
         return Stream.of(
@@ -49,10 +50,11 @@ class GitlabApiClientTest {
                 Arguments.of("project #123", "123"),
                 Arguments.of(" group / subgroup / repo.git ", "group%2Fsubgroup%2Frepo"),
                 Arguments.of("git@gitlab.example:group/subgroup/repo.git", "group%2Fsubgroup%2Frepo"),
-                Arguments.of("https://gitlab.example/group/subgroup/repo/-/merge_requests/42", "group%2Fsubgroup%2Frepo"),
-                Arguments.of("https://gitlab.example/api/v4/projects/group%2Fsubgroup%2Frepo", "group%2Fsubgroup%2Frepo"),
-                Arguments.of("\"group/subgroup/repo!42\"", "group%2Fsubgroup%2Frepo")
-        );
+                Arguments.of(
+                        "https://gitlab.example/group/subgroup/repo/-/merge_requests/42", "group%2Fsubgroup%2Frepo"),
+                Arguments.of(
+                        "https://gitlab.example/api/v4/projects/group%2Fsubgroup%2Frepo", "group%2Fsubgroup%2Frepo"),
+                Arguments.of("\"group/subgroup/repo!42\"", "group%2Fsubgroup%2Frepo"));
     }
 
     private static Stream<Arguments> mergeRequestIidInputs() {
@@ -60,8 +62,7 @@ class GitlabApiClientTest {
                 Arguments.of("2115", 2115L),
                 Arguments.of("!2115", 2115L),
                 Arguments.of("group/repo!2115", 2115L),
-                Arguments.of("https://gitlab.example/group/repo/-/merge_requests/2115", 2115L)
-        );
+                Arguments.of("https://gitlab.example/group/repo/-/merge_requests/2115", 2115L));
     }
 
     private static Stream<Arguments> pipelineIdInputs() {
@@ -70,8 +71,7 @@ class GitlabApiClientTest {
                 Arguments.of("#123", 123L),
                 Arguments.of("pipeline #123", 123L),
                 Arguments.of("https://gitlab.example/group/repo/-/pipelines/123", 123L),
-                Arguments.of("https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/123", 123L)
-        );
+                Arguments.of("https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/123", 123L));
     }
 
     private static Stream<Arguments> jobIdInputs() {
@@ -80,8 +80,7 @@ class GitlabApiClientTest {
                 Arguments.of("#8", 8L),
                 Arguments.of("job #8", 8L),
                 Arguments.of("https://gitlab.example/group/repo/-/jobs/8", 8L),
-                Arguments.of("https://gitlab.example/api/v4/projects/group%2Frepo/jobs/8", 8L)
-        );
+                Arguments.of("https://gitlab.example/api/v4/projects/group%2Frepo/jobs/8", 8L));
     }
 
     private static Stream<Arguments> mergeRequestStates() {
@@ -92,8 +91,7 @@ class GitlabApiClientTest {
                 Arguments.of("locked", "locked"),
                 Arguments.of("merge", "merged"),
                 Arguments.of("any", "all"),
-                Arguments.of("*", "all")
-        );
+                Arguments.of("*", "all"));
     }
 
     private static byte[] zip(String... entries) throws Exception {
@@ -216,16 +214,19 @@ class GitlabApiClientTest {
     void getBuildsApiUriAddsPrivateTokenAndPrettyPrintsJson() throws Exception {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", " token ", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", " token ", List.of(), 20, 100), builder);
 
-        server.expect(once(), requestTo("https://gitlab.example/api/v4/projects?search=demo&membership=true&page=2&per_page=10"))
+        server.expect(
+                        once(),
+                        requestTo(
+                                "https://gitlab.example/api/v4/projects?search=demo&membership=true&page=2&per_page=10"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("PRIVATE-TOKEN", "token"))
                 .andRespond(withSuccess("{\"id\":7,\"name\":\"Demo\"}", MediaType.APPLICATION_JSON));
 
-        String response = client.get("/projects",
+        String response = client.get(
+                "/projects",
                 client.param("search", "demo"),
                 client.param("membership", true),
                 client.param("page", 2),
@@ -241,9 +242,8 @@ class GitlabApiClientTest {
     void getRawTextReturnsTraceWithoutJsonPrettyPrinting() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/1/jobs/8/trace"))
                 .andExpect(method(HttpMethod.GET))
@@ -258,9 +258,8 @@ class GitlabApiClientTest {
     void getAllPagesFollowsGitlabLinkHeader() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
         String nextPage = "https://gitlab.example/api/v4/projects?page=2&per_page=1";
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects?page=1&per_page=1"))
@@ -270,11 +269,7 @@ class GitlabApiClientTest {
                 .andRespond(withSuccess("[{\"id\":2,\"name\":\"two\"}]", MediaType.APPLICATION_JSON));
 
         var page = client.getAllPages(
-                "/projects",
-                Project.class,
-                10,
-                client.param("page", 1),
-                client.param("per_page", 1));
+                "/projects", Project.class, 10, client.param("page", 1), client.param("per_page", 1));
 
         assertThat(page.items()).extracting(Project::id).containsExactly(1L, 2L);
         assertThat(page.totalFetched()).isEqualTo(2);
@@ -287,20 +282,15 @@ class GitlabApiClientTest {
     void getAllPagesStopsAtConfiguredItemLimit() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects?per_page=100"))
                 .andRespond(withSuccess("""
                         [{"id": 1, "name": "one"}, {"id": 2, "name": "two"}]
                         """, MediaType.APPLICATION_JSON));
 
-        var page = client.getAllPages(
-                "/projects",
-                Project.class,
-                1,
-                client.param("per_page", 100));
+        var page = client.getAllPages("/projects", Project.class, 1, client.param("per_page", 100));
 
         assertThat(page.items()).extracting(Project::id).containsExactly(1L);
         assertThat(page.totalFetched()).isEqualTo(1);
@@ -310,23 +300,19 @@ class GitlabApiClientTest {
 
     @ParameterizedTest
     @MethodSource("gitlabErrorStatuses")
-    void getMapsHttpStatusesToTypedExceptions(
-            HttpStatus status,
-            Class<? extends GitlabApiException> exceptionType
-    ) {
+    void getMapsHttpStatusesToTypedExceptions(HttpStatus status, Class<? extends GitlabApiException> exceptionType) {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/user"))
                 .andRespond(withStatus(status).header("Retry-After", "7"));
 
         assertThatThrownBy(() -> client.get("/user"))
                 .isInstanceOf(exceptionType)
-                .satisfies(error -> assertThat(((GitlabApiException) error).statusCode())
-                        .isEqualTo(status.value()));
+                .satisfies(error ->
+                        assertThat(((GitlabApiException) error).statusCode()).isEqualTo(status.value()));
         server.verify();
     }
 
@@ -334,9 +320,8 @@ class GitlabApiClientTest {
     void rateLimitExceptionExposesRetryDelay() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/user"))
                 .andRespond(withStatus(HttpStatus.TOO_MANY_REQUESTS).header("Retry-After", "7"));
@@ -383,17 +368,15 @@ class GitlabApiClientTest {
                 Arguments.of(HttpStatus.FORBIDDEN, GitlabForbiddenException.class),
                 Arguments.of(HttpStatus.NOT_FOUND, GitlabNotFoundException.class),
                 Arguments.of(HttpStatus.TOO_MANY_REQUESTS, GitlabRateLimitedException.class),
-                Arguments.of(HttpStatus.BAD_GATEWAY, GitlabServerException.class)
-        );
+                Arguments.of(HttpStatus.BAD_GATEWAY, GitlabServerException.class));
     }
 
     @Test
     void getLimitedTextRedactsSecretsAndTruncatesByUtf8Bytes() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/1/jobs/8/artifacts/target/report.txt"))
                 .andRespond(withSuccess("GITLAB_TOKEN=secret-token\n0123456789", MediaType.TEXT_PLAIN));
@@ -408,9 +391,8 @@ class GitlabApiClientTest {
     void getLimitedTextUsesDefaultBoundWhenMaxBytesIsDisabled() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
         String payload = "x".repeat(60_010);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/1/jobs/8/artifacts/target/report.txt"))
@@ -428,9 +410,8 @@ class GitlabApiClientTest {
     void getTailTextRedactsSecretsAndReturnsLastUtf8Bytes() {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/1/jobs/8/trace"))
                 .andRespond(withSuccess("first line\nTOKEN=secret-token\nlast failure", MediaType.TEXT_PLAIN));
@@ -450,22 +431,25 @@ class GitlabApiClientTest {
     void listArtifactArchiveStreamsZipAndAppliesPathRecursiveAndPagination() throws Exception {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/1/jobs/8/artifacts"))
                 .andExpect(method(HttpMethod.GET))
                 .andExpect(header("PRIVATE-TOKEN", "token"))
-                .andRespond(withSuccess(zip(
-                        "target/surefire-reports/TEST-ServiceTest.xml",
-                        "target/surefire-reports/com.example.ServiceTest.txt",
-                        "target/app.jar",
-                        "README.md"), MediaType.APPLICATION_OCTET_STREAM));
+                .andRespond(withSuccess(
+                        zip(
+                                "target/surefire-reports/TEST-ServiceTest.xml",
+                                "target/surefire-reports/com.example.ServiceTest.txt",
+                                "target/app.jar",
+                                "README.md"),
+                        MediaType.APPLICATION_OCTET_STREAM));
 
-        var response = client.listArtifactArchive("/projects/1/jobs/8/artifacts", "target/surefire-reports", true, 1, 10);
+        var response =
+                client.listArtifactArchive("/projects/1/jobs/8/artifacts", "target/surefire-reports", true, 1, 10);
 
-        assertThat(response).extracting("path")
+        assertThat(response)
+                .extracting("path")
                 .containsExactly(
                         "target/surefire-reports/TEST-ServiceTest.xml",
                         "target/surefire-reports/com.example.ServiceTest.txt");
@@ -477,19 +461,18 @@ class GitlabApiClientTest {
     void findArtifactArchiveFilesSupportsGlobPatterns() throws Exception {
         RestClient.Builder builder = RestClient.builder();
         MockRestServiceServer server = MockRestServiceServer.bindTo(builder).build();
-        GitlabApiClient client = client(
-                new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100),
-                builder);
+        GitlabApiClient client =
+                client(new GitlabProperties("https://gitlab.example/", "token", List.of(), 20, 100), builder);
 
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/1/jobs/8/artifacts"))
-                .andRespond(withSuccess(zip(
-                        "reports/TEST-ServiceTest.xml",
-                        "reports/ServiceTest.txt",
-                        "logs/build.log"), MediaType.APPLICATION_OCTET_STREAM));
+                .andRespond(withSuccess(
+                        zip("reports/TEST-ServiceTest.xml", "reports/ServiceTest.txt", "logs/build.log"),
+                        MediaType.APPLICATION_OCTET_STREAM));
 
         var response = client.findArtifactArchiveFiles("/projects/1/jobs/8/artifacts", "**/TEST-*.xml", false, 1, 10);
 
-        assertThat(response).singleElement()
+        assertThat(response)
+                .singleElement()
                 .satisfies(file -> assertThat(file.path()).isEqualTo("reports/TEST-ServiceTest.xml"));
         server.verify();
     }
@@ -555,12 +538,7 @@ class GitlabApiClientTest {
         return new GitlabApiClient(properties, objectMapper, builder);
     }
 
-    private GitlabProperties properties(
-            String token,
-            String tokenFile,
-            int retryAttempts,
-            long maxDownloadBytes
-    ) {
+    private GitlabProperties properties(String token, String tokenFile, int retryAttempts, long maxDownloadBytes) {
         return new GitlabProperties(
                 "https://gitlab.example",
                 token,

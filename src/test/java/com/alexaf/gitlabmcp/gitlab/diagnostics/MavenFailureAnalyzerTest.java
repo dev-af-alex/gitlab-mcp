@@ -23,14 +23,14 @@ class MavenFailureAnalyzerTest {
         assertThat(summary.detectedCause()).isEqualTo("Maven/Surefire test failure");
         assertThat(summary.testsRun()).isEqualTo(2632);
         assertThat(summary.failures()).isEqualTo(1);
-        assertThat(summary.failingTests()).singleElement()
-                .satisfies(failure -> {
-                    assertThat(failure.className()).isEqualTo("OrgRegRequestClientController_CheckTest");
-                    assertThat(failure.methodName()).isEqualTo("checkOther_keyFirstAuthNotAdded");
-                    assertThat(failure.expected()).isEqualTo("409");
-                    assertThat(failure.actual()).isEqualTo("200");
-                });
-        assertThat(summary.recommendedNextTools()).contains("gitlab_find_job_artifact_files", "gitlab_get_merge_request_changes");
+        assertThat(summary.failingTests()).singleElement().satisfies(failure -> {
+            assertThat(failure.className()).isEqualTo("OrgRegRequestClientController_CheckTest");
+            assertThat(failure.methodName()).isEqualTo("checkOther_keyFirstAuthNotAdded");
+            assertThat(failure.expected()).isEqualTo("409");
+            assertThat(failure.actual()).isEqualTo("200");
+        });
+        assertThat(summary.recommendedNextTools())
+                .contains("gitlab_find_job_artifact_files", "gitlab_get_merge_request_changes");
     }
 
     @Test
@@ -45,12 +45,11 @@ class MavenFailureAnalyzerTest {
         assertThat(summary.testFailureDetected()).isTrue();
         assertThat(summary.errors()).isEqualTo(3);
         assertThat(summary.errorTests()).hasSize(2);
-        assertThat(summary.errorTests().getFirst())
-                .satisfies(error -> {
-                    assertThat(error.className()).isEqualTo("OrderControllerTest");
-                    assertThat(error.errorType()).isEqualTo("IllegalState");
-                    assertThat(error.contextCascade()).isFalse();
-                });
+        assertThat(summary.errorTests().getFirst()).satisfies(error -> {
+            assertThat(error.className()).isEqualTo("OrderControllerTest");
+            assertThat(error.errorType()).isEqualTo("IllegalState");
+            assertThat(error.contextCascade()).isFalse();
+        });
         assertThat(summary.errorTests().get(1).contextCascade()).isTrue();
     }
 }

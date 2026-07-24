@@ -10,6 +10,4 @@ public record GitlabTestCase(
         String classname,
         @JsonProperty("execution_time") Double executionTime,
         @JsonProperty("system_output") String systemOutput,
-        @JsonProperty("stack_trace") String stackTrace
-) {
-}
+        @JsonProperty("stack_trace") String stackTrace) {}

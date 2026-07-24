@@ -1,9 +1,5 @@
 package com.alexaf.gitlabmcp;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.Test;
-
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -13,6 +9,10 @@ import java.time.Duration;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.Test;
+
 import static org.assertj.core.api.Assertions.assertThat;
 
 class StdioMcpIT {
@@ -21,7 +21,8 @@ class StdioMcpIT {
 
     @Test
     void respondsToInitializeWithoutNonProtocolStdout() throws Exception {
-        Process process = new ProcessBuilder(javaExecutable(), "-jar", applicationJar().toString())
+        Process process = new ProcessBuilder(
+                        javaExecutable(), "-jar", applicationJar().toString())
                 .redirectError(ProcessBuilder.Redirect.PIPE)
                 .start();
         process.getOutputStream().write("""
@@ -29,10 +30,10 @@ class StdioMcpIT {
                 """.getBytes(StandardCharsets.UTF_8));
         process.getOutputStream().flush();
 
-        BufferedReader stdout = new BufferedReader(new InputStreamReader(
-                process.getInputStream(), StandardCharsets.UTF_8));
-        String firstLine = CompletableFuture.supplyAsync(() -> readLine(stdout))
-                .get(TIMEOUT.toSeconds(), TimeUnit.SECONDS);
+        BufferedReader stdout =
+                new BufferedReader(new InputStreamReader(process.getInputStream(), StandardCharsets.UTF_8));
+        String firstLine =
+                CompletableFuture.supplyAsync(() -> readLine(stdout)).get(TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         process.getOutputStream().close();
         boolean exited = process.waitFor(TIMEOUT.toSeconds(), TimeUnit.SECONDS);
         if (!exited) {
@@ -40,14 +41,18 @@ class StdioMcpIT {
         }
         String stderr = new String(process.getErrorStream().readAllBytes(), StandardCharsets.UTF_8);
 
-        assertThat(exited).as("server exits after stdin closes; stderr=%s", stderr).isTrue();
+        assertThat(exited)
+                .as("server exits after stdin closes; stderr=%s", stderr)
+                .isTrue();
         assertThat(process.exitValue()).as("stderr=%s", stderr).isZero();
         JsonNode response = new ObjectMapper().readTree(firstLine);
         assertThat(response.path("jsonrpc").asText()).isEqualTo("2.0");
         assertThat(response.path("id").asInt()).isEqualTo(1);
         assertThat(response.path("result").path("serverInfo").path("name").asText())
                 .isEqualTo("gitlab-mcp");
-        assertThat(stdout.readLine()).as("stdout must contain protocol messages only").isNull();
+        assertThat(stdout.readLine())
+                .as("stdout must contain protocol messages only")
+                .isNull();
     }
 
     private String readLine(BufferedReader reader) {
@@ -61,8 +66,7 @@ class StdioMcpIT {
     private Path applicationJar() throws Exception {
         Path target = Path.of("target");
         try (var files = Files.list(target)) {
-            return files
-                    .filter(path -> path.getFileName().toString().startsWith("gitlab-mcp-"))
+            return files.filter(path -> path.getFileName().toString().startsWith("gitlab-mcp-"))
                     .filter(path -> path.getFileName().toString().endsWith(".jar"))
                     .findFirst()
                     .orElseThrow(() -> new IllegalStateException("Packaged application JAR was not found"));
@@ -70,9 +74,7 @@ class StdioMcpIT {
     }
 
     private String javaExecutable() {
-        String executable = System.getProperty("os.name").toLowerCase().contains("win")
-                ? "java.exe"
-                : "java";
+        String executable = System.getProperty("os.name").toLowerCase().contains("win") ? "java.exe" : "java";
         return Path.of(System.getProperty("java.home"), "bin", executable).toString();
     }
 }

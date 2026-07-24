@@ -1,11 +1,13 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
-import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
+import java.util.concurrent.atomic.AtomicReference;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
+
 import org.springframework.stereotype.Component;
 
-import java.util.concurrent.atomic.AtomicReference;
+import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
+import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
 
 @Component
 public class GitlabServerInfoProvider {
@@ -14,10 +16,7 @@ public class GitlabServerInfoProvider {
     private final GitlabCapabilityResolver capabilityResolver;
     private final AtomicReference<GitlabServerInfo> cached = new AtomicReference<>();
 
-    public GitlabServerInfoProvider(
-            GitlabApiClient gitlab,
-            GitlabCapabilityResolver capabilityResolver
-    ) {
+    public GitlabServerInfoProvider(GitlabApiClient gitlab, GitlabCapabilityResolver capabilityResolver) {
         this.gitlab = gitlab;
         this.capabilityResolver = capabilityResolver;
     }
@@ -34,6 +33,5 @@ public class GitlabServerInfoProvider {
     }
 
     @JsonIgnoreProperties(ignoreUnknown = true)
-    public record VersionResponse(String version, String revision) {
-    }
+    public record VersionResponse(String version, String revision) {}
 }

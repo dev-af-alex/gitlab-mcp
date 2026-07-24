@@ -1,17 +1,16 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
-import org.springframework.http.HttpHeaders;
-import org.springframework.util.StringUtils;
-
 import java.net.URI;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.springframework.http.HttpHeaders;
+import org.springframework.util.StringUtils;
+
 public record GitlabHttpResponse(String body, HttpHeaders headers) {
 
-    private static final Pattern NEXT_LINK = Pattern.compile(
-            "<([^>]+)>\\s*;\\s*rel\\s*=\\s*\"?next\"?",
-            Pattern.CASE_INSENSITIVE);
+    private static final Pattern NEXT_LINK =
+            Pattern.compile("<([^>]+)>\\s*;\\s*rel\\s*=\\s*\"?next\"?", Pattern.CASE_INSENSITIVE);
 
     public GitlabHttpResponse {
         body = body == null ? "" : body;

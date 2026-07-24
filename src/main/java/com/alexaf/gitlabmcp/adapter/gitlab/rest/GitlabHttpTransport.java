@@ -1,15 +1,15 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabApiException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabClientException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabForbiddenException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabRateLimitedException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabServerException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabTransportException;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabUnauthorizedException;
+import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardOpenOption;
+import java.time.Duration;
+import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.function.Supplier;
+
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatusCode;
@@ -20,15 +20,16 @@ import org.springframework.web.client.RestClientException;
 import org.springframework.web.client.RestClientResponseException;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.net.URI;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardOpenOption;
-import java.time.Duration;
-import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
-import java.util.List;
-import java.util.function.Supplier;
+import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabApiException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabClientException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDownloadLimitException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabForbiddenException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabNotFoundException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabRateLimitedException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabServerException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabTransportException;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabUnauthorizedException;
 
 @Component
 public class GitlabHttpTransport {
@@ -40,10 +41,7 @@ public class GitlabHttpTransport {
 
     @Autowired
     public GitlabHttpTransport(
-            GitlabProperties properties,
-            RestClient.Builder restClientBuilder,
-            GitlabTokenProvider tokenProvider
-    ) {
+            GitlabProperties properties, RestClient.Builder restClientBuilder, GitlabTokenProvider tokenProvider) {
         this.properties = properties;
         this.tokenProvider = tokenProvider;
         this.apiUrl = normalizeApiUrl(properties.url());
@@ -70,7 +68,8 @@ public class GitlabHttpTransport {
 
     private GitlabHttpResponse getOnce(URI uri) {
         try {
-            var response = restClient.get()
+            var response = restClient
+                    .get()
                     .uri(uri)
                     .header("PRIVATE-TOKEN", tokenProvider.get())
                     .retrieve()
@@ -90,7 +89,8 @@ public class GitlabHttpTransport {
 
     private Path downloadOnce(URI uri) {
         try {
-            return restClient.get()
+            return restClient
+                    .get()
                     .uri(uri)
                     .header("PRIVATE-TOKEN", tokenProvider.get())
                     .exchange((request, response) -> {
@@ -104,7 +104,7 @@ public class GitlabHttpTransport {
                         }
                         Path file = createTempFile(uri);
                         try (var input = response.getBody();
-                             var output = Files.newOutputStream(file, StandardOpenOption.WRITE)) {
+                                var output = Files.newOutputStream(file, StandardOpenOption.WRITE)) {
                             byte[] buffer = new byte[16_384];
                             long total = 0;
                             int read;
@@ -149,13 +149,11 @@ public class GitlabHttpTransport {
         if (error instanceof GitlabRateLimitedException) {
             return true;
         }
-        return error instanceof GitlabServerException
-                && (error.statusCode() == 502 || error.statusCode() == 503);
+        return error instanceof GitlabServerException && (error.statusCode() == 502 || error.statusCode() == 503);
     }
 
     private void pauseBeforeRetry(URI uri, GitlabApiException error, int attempt) {
-        Duration delay = error instanceof GitlabRateLimitedException rateLimited
-                && rateLimited.retryAfter() != null
+        Duration delay = error instanceof GitlabRateLimitedException rateLimited && rateLimited.retryAfter() != null
                 ? rateLimited.retryAfter()
                 : retryBackoff(attempt);
         long delayMillis = Math.min(Math.max(0, delay.toMillis()), 30_000);
@@ -171,9 +169,7 @@ public class GitlabHttpTransport {
     }
 
     private Duration retryBackoff(int attempt) {
-        Duration base = properties.retryBackoff() == null
-                ? Duration.ZERO
-                : properties.retryBackoff();
+        Duration base = properties.retryBackoff() == null ? Duration.ZERO : properties.retryBackoff();
         long multiplier = 1L << Math.min(attempt, 10);
         return base.multipliedBy(multiplier);
     }
@@ -189,20 +185,16 @@ public class GitlabHttpTransport {
         return builder.build(true).toUri();
     }
 
-    private GitlabApiException exception(
-            URI uri,
-            HttpStatusCode status,
-            HttpHeaders headers,
-            Throwable cause
-    ) {
+    private GitlabApiException exception(URI uri, HttpStatusCode status, HttpHeaders headers, Throwable cause) {
         return switch (status.value()) {
             case 401 -> new GitlabUnauthorizedException(uri, cause);
             case 403 -> new GitlabForbiddenException(uri, cause);
             case 404 -> new GitlabNotFoundException(uri, cause);
             case 429 -> new GitlabRateLimitedException(uri, retryAfter(headers), cause);
-            default -> status.is5xxServerError()
-                    ? new GitlabServerException(uri, status.value(), cause)
-                    : new GitlabClientException(uri, status.value(), cause);
+            default ->
+                status.is5xxServerError()
+                        ? new GitlabServerException(uri, status.value(), cause)
+                        : new GitlabClientException(uri, status.value(), cause);
         };
     }
 
@@ -218,9 +210,7 @@ public class GitlabHttpTransport {
             return Duration.ofSeconds(Long.parseLong(value.trim()));
         } catch (NumberFormatException ignored) {
             try {
-                ZonedDateTime retryAt = ZonedDateTime.parse(
-                        value.trim(),
-                        DateTimeFormatter.RFC_1123_DATE_TIME);
+                ZonedDateTime retryAt = ZonedDateTime.parse(value.trim(), DateTimeFormatter.RFC_1123_DATE_TIME);
                 Duration delay = Duration.between(ZonedDateTime.now(retryAt.getZone()), retryAt);
                 return delay.isNegative() ? Duration.ZERO : delay;
             } catch (Exception invalidDate) {
@@ -251,9 +241,7 @@ public class GitlabHttpTransport {
     }
 
     private long effectiveMaxDownloadBytes() {
-        return properties.maxDownloadBytes() > 0
-                ? properties.maxDownloadBytes()
-                : Long.MAX_VALUE;
+        return properties.maxDownloadBytes() > 0 ? properties.maxDownloadBytes() : Long.MAX_VALUE;
     }
 
     private String trimTrailingSlash(String value) {

@@ -7,6 +7,4 @@ import com.fasterxml.jackson.annotation.JsonProperty;
 public record DiffRefs(
         @JsonProperty("base_sha") String baseSha,
         @JsonProperty("head_sha") String headSha,
-        @JsonProperty("start_sha") String startSha
-) {
-}
+        @JsonProperty("start_sha") String startSha) {}

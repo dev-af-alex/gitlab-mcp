@@ -1,14 +1,5 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.Node;
-import org.w3c.dom.NodeList;
-
-import javax.xml.XMLConstants;
-import javax.xml.parsers.DocumentBuilderFactory;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -16,16 +7,26 @@ import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilderFactory;
+
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
 @Component
-public class SurefireReportAnalyzer {
+public class SurefireReportAnalyzer { // NOPMD - existing complexity baseline
 
     private static final Pattern TEST_SET = Pattern.compile("Test set:\\s*(\\S+)");
-    private static final Pattern TXT_TEST_CASE = Pattern.compile(
-            "^\\s*(\\S+)\\s+Time elapsed:.*<<<\\s*(FAILURE|ERROR)!.*$");
+    private static final Pattern TXT_TEST_CASE =
+            Pattern.compile("^\\s*(\\S+)\\s+Time elapsed:.*<<<\\s*(FAILURE|ERROR)!.*$");
     private static final Pattern EXCEPTION = Pattern.compile(
             "^\\s*([a-zA-Z_$][\\w$]*(?:\\.[a-zA-Z_$][\\w$]*)*(?:Exception|Error|Failure))(?::\\s*(.*))?$");
-    private static final Pattern STACK_FRAME = Pattern.compile(
-            "^\\s*at\\s+[^\\s(]+\\(([^)]+\\.java:\\d+)\\).*$");
+    private static final Pattern STACK_FRAME = Pattern.compile("^\\s*at\\s+[^\\s(]+\\(([^)]+\\.java:\\d+)\\).*$");
     private static final int MAX_TEST_FAILURES = 20;
     private static final int MAX_MESSAGE_LENGTH = 600;
     private static final Pattern TEST_COUNTS = Pattern.compile(
@@ -39,9 +40,7 @@ public class SurefireReportAnalyzer {
     public SurefireReportInsight analyze(String path, String text) {
         String value = text == null ? "" : text;
         Counts counts = counts(value);
-        List<SurefireTestFailure> testFailures = isXml(value)
-                                                 ? xmlTestFailures(value)
-                                                 : textTestFailures(value);
+        List<SurefireTestFailure> testFailures = isXml(value) ? xmlTestFailures(value) : textTestFailures(value);
         List<String> evidence = evidence(value);
         String rootCauseMessage = rootCauseMessage(value, evidence, testFailures);
         String rootCauseType = rootCauseType(value, testFailures);
@@ -75,8 +74,11 @@ public class SurefireReportAnalyzer {
         if (last.testsRun() == null && isXml(text)) {
             try {
                 Element suite = parseXml(text).getDocumentElement();
-                last = new Counts(attributeInt(suite, "tests"), attributeInt(suite, "failures"),
-                        attributeInt(suite, "errors"), attributeInt(suite, "skipped"));
+                last = new Counts(
+                        attributeInt(suite, "tests"),
+                        attributeInt(suite, "failures"),
+                        attributeInt(suite, "errors"),
+                        attributeInt(suite, "skipped"));
             } catch (Exception ignored) {
                 // A malformed or truncated XML report is still useful for text-level evidence.
             }
@@ -141,7 +143,8 @@ public class SurefireReportAnalyzer {
                 .orElseGet(() -> firstNonBlankLine(text));
     }
 
-    private String rootCauseType(String text, List<SurefireTestFailure> testFailures) {
+    private String rootCauseType( // NOPMD - existing complexity baseline
+            String text, List<SurefireTestFailure> testFailures) {
         if (containsIgnoreCase(text, "ryuk")
                 || containsIgnoreCase(text, "Container startup failed")
                 || containsIgnoreCase(text, "dockerjava")
@@ -186,7 +189,7 @@ public class SurefireReportAnalyzer {
                 || containsIgnoreCase(line, "Caused by:");
     }
 
-    private List<SurefireTestFailure> textTestFailures(String text) {
+    private List<SurefireTestFailure> textTestFailures(String text) { // NOPMD - existing complexity baseline
         List<SurefireTestFailure> result = new ArrayList<>();
         String currentMethod = null;
         String currentKind = null;
@@ -197,8 +200,8 @@ public class SurefireReportAnalyzer {
             Matcher caseMatcher = TXT_TEST_CASE.matcher(line);
             if (caseMatcher.matches()) {
                 if (currentMethod != null) {
-                    result.add(new SurefireTestFailure(currentMethod, currentKind, exceptionType,
-                            message, sourceLocation));
+                    result.add(new SurefireTestFailure(
+                            currentMethod, currentKind, exceptionType, message, sourceLocation));
                 }
                 currentMethod = caseMatcher.group(1);
                 currentKind = caseMatcher.group(2).toLowerCase();
@@ -230,7 +233,7 @@ public class SurefireReportAnalyzer {
         return result.stream().limit(MAX_TEST_FAILURES).toList();
     }
 
-    private List<SurefireTestFailure> xmlTestFailures(String text) {
+    private List<SurefireTestFailure> xmlTestFailures(String text) { // NOPMD - existing complexity baseline
         List<SurefireTestFailure> result = new ArrayList<>();
         try {
             NodeList testCases = parseXml(text).getElementsByTagName("testcase");
@@ -288,8 +291,7 @@ public class SurefireReportAnalyzer {
         factory.setFeature("http://apache.org/xml/features/disallow-doctype-decl", true);
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_DTD, "");
         factory.setAttribute(XMLConstants.ACCESS_EXTERNAL_SCHEMA, "");
-        return factory.newDocumentBuilder()
-                .parse(new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)));
+        return factory.newDocumentBuilder().parse(new ByteArrayInputStream(text.getBytes(StandardCharsets.UTF_8)));
     }
 
     private Integer attributeInt(Element element, String name) {
@@ -329,8 +331,8 @@ public class SurefireReportAnalyzer {
         }
         String normalized = value.strip().replaceAll("\\s+", " ");
         return normalized.length() > MAX_MESSAGE_LENGTH
-               ? normalized.substring(0, MAX_MESSAGE_LENGTH) + "..."
-               : normalized;
+                ? normalized.substring(0, MAX_MESSAGE_LENGTH) + "..."
+                : normalized;
     }
 
     private String textOrNull(String value) {
@@ -350,6 +352,5 @@ public class SurefireReportAnalyzer {
         return null;
     }
 
-    private record Counts(Integer testsRun, Integer failures, Integer errors, Integer skipped) {
-    }
+    private record Counts(Integer testsRun, Integer failures, Integer errors, Integer skipped) {}
 }

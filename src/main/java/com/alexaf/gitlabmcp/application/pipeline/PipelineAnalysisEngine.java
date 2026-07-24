@@ -1,14 +1,15 @@
 package com.alexaf.gitlabmcp.application.pipeline;
 
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
+
+import org.springframework.stereotype.Component;
+
 import com.alexaf.gitlabmcp.domain.Finding;
 import com.alexaf.gitlabmcp.domain.PipelineAnalysis;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.port.FailureAnalyzer;
-import org.springframework.stereotype.Component;
-
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.List;
 
 @Component
 public class PipelineAnalysisEngine {

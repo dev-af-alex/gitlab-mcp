@@ -1,22 +1,5 @@
 package com.alexaf.gitlabmcp.gitlab.client;
 
-import com.alexaf.gitlabmcp.adapter.gitlab.rest.ArtifactArchiveReader;
-import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabHttpTransport;
-import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabHttpResponse;
-import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabQueryParameter;
-import com.alexaf.gitlabmcp.adapter.gitlab.rest.SecretRedactor;
-import com.alexaf.gitlabmcp.domain.GitlabPage;
-import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDecodeException;
-import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
-import com.fasterxml.jackson.databind.JavaType;
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-import org.springframework.web.client.RestClient;
-import org.springframework.web.util.UriUtils;
-
 import java.net.URI;
 import java.net.URISyntaxException;
 import java.net.URLDecoder;
@@ -37,9 +20,27 @@ import java.util.Set;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import com.fasterxml.jackson.databind.JavaType;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+import org.springframework.web.client.RestClient;
+import org.springframework.web.util.UriUtils;
+
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.ArtifactArchiveReader;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabHttpResponse;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabHttpTransport;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.GitlabQueryParameter;
+import com.alexaf.gitlabmcp.adapter.gitlab.rest.SecretRedactor;
+import com.alexaf.gitlabmcp.domain.GitlabPage;
+import com.alexaf.gitlabmcp.gitlab.client.error.GitlabDecodeException;
+import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 
 @Component
-public class GitlabApiClient {
+public class GitlabApiClient { // NOPMD - existing complexity baseline
 
     private static final String TRUNCATED_SUFFIX = "\n[truncated to %d bytes]";
     private static final String TAIL_TRUNCATED_PREFIX = "[truncated to last %d bytes]\n";
@@ -58,8 +59,7 @@ public class GitlabApiClient {
             ObjectMapper objectMapper,
             GitlabHttpTransport transport,
             ArtifactArchiveReader artifactArchiveReader,
-            SecretRedactor secretRedactor
-    ) {
+            SecretRedactor secretRedactor) {
         this.properties = properties;
         this.objectMapper = objectMapper;
         this.transport = transport;
@@ -68,8 +68,11 @@ public class GitlabApiClient {
         this.allowedProjects = normalizeAllowedProjects(properties.allowedProjects());
     }
 
-    public GitlabApiClient(GitlabProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
-        this(properties, objectMapper,
+    public GitlabApiClient(
+            GitlabProperties properties, ObjectMapper objectMapper, RestClient.Builder restClientBuilder) {
+        this(
+                properties,
+                objectMapper,
                 new GitlabHttpTransport(properties, restClientBuilder),
                 new ArtifactArchiveReader(),
                 new SecretRedactor());
@@ -142,7 +145,8 @@ public class GitlabApiClient {
     }
 
     private static String decodeUtf8Slice(byte[] bytes, int offset, int length) {
-        CharsetDecoder decoder = StandardCharsets.UTF_8.newDecoder()
+        CharsetDecoder decoder = StandardCharsets.UTF_8
+                .newDecoder()
                 .onMalformedInput(CodingErrorAction.IGNORE)
                 .onUnmappableCharacter(CodingErrorAction.IGNORE);
         try {
@@ -174,8 +178,7 @@ public class GitlabApiClient {
     }
 
     private static String normalizeProject(String project) {
-        return normalizeProjectId(project)
-                .toLowerCase(Locale.ROOT);
+        return normalizeProjectId(project).toLowerCase(Locale.ROOT);
     }
 
     private static String normalizeProjectId(String projectId) {
@@ -256,8 +259,7 @@ public class GitlabApiClient {
     }
 
     private static String decode(String value) {
-        return URLDecoder.decode(value
-                .replace("%2F", "%2f"), StandardCharsets.UTF_8);
+        return URLDecoder.decode(value.replace("%2F", "%2f"), StandardCharsets.UTF_8);
     }
 
     private static String stripWrappingQuotes(String value) {
@@ -321,7 +323,8 @@ public class GitlabApiClient {
         }
     }
 
-    public List<ArtifactFile> listArtifactArchive(String archivePath, String path, Boolean recursive, Integer page, Integer perPage) {
+    public List<ArtifactFile> listArtifactArchive(
+            String archivePath, String path, Boolean recursive, Integer page, Integer perPage) {
         Path file = downloadToTempFile(archivePath);
         try {
             return page(artifactArchiveReader.list(file, path, recursive), page, perPage);
@@ -330,7 +333,8 @@ public class GitlabApiClient {
         }
     }
 
-    public List<ArtifactFile> findArtifactArchiveFiles(String archivePath, String pattern, Boolean regex, Integer page, Integer perPage) {
+    public List<ArtifactFile> findArtifactArchiveFiles(
+            String archivePath, String pattern, Boolean regex, Integer page, Integer perPage) {
         Path file = downloadToTempFile(archivePath);
         try {
             Pattern compiled = compilePathPattern(pattern, regex);
@@ -354,18 +358,10 @@ public class GitlabApiClient {
         GitlabHttpResponse response = transport.get(path, queryParameters(queryParams));
         List<T> items = readList(response.body(), itemType);
         return new GitlabPage<>(
-                items,
-                response.nextLink() == null ? null : response.nextLink().toString(),
-                items.size(),
-                false);
+                items, response.nextLink() == null ? null : response.nextLink().toString(), items.size(), false);
     }
 
-    public <T> GitlabPage<T> getAllPages(
-            String path,
-            Class<T> itemType,
-            int maxItems,
-            QueryParam... queryParams
-    ) {
+    public <T> GitlabPage<T> getAllPages(String path, Class<T> itemType, int maxItems, QueryParam... queryParams) {
         int effectiveMaxItems = Math.max(1, maxItems);
         GitlabHttpResponse response = transport.get(path, queryParameters(queryParams));
         List<T> collected = new ArrayList<>();
@@ -423,39 +419,44 @@ public class GitlabApiClient {
             trimmed = trimmed.substring(1);
         }
         if (!trimmed.matches("\\d+")) {
-            throw new IllegalArgumentException("mergeRequestIid must be a numeric IID, !IID, or GitLab merge request URL: " + value);
+            throw new IllegalArgumentException(
+                    "mergeRequestIid must be a numeric IID, !IID, or GitLab merge request URL: " + value);
         }
         return Long.parseLong(trimmed);
     }
 
     public long pipelineId(String value) {
-        return numericGitlabId(value, "pipelineId", List.of(
-                Pattern.compile("/pipelines/(\\d+)"),
-                Pattern.compile("(?i)^pipeline\\s+#?(\\d+)$")
-        ));
+        return numericGitlabId(
+                value,
+                "pipelineId",
+                List.of(Pattern.compile("/pipelines/(\\d+)"), Pattern.compile("(?i)^pipeline\\s+#?(\\d+)$")));
     }
 
     public long jobId(String value) {
-        return numericGitlabId(value, "jobId", List.of(
-                Pattern.compile("/-/jobs/(\\d+)"),
-                Pattern.compile("/jobs/(\\d+)"),
-                Pattern.compile("(?i)^job\\s+#?(\\d+)$")
-        ));
+        return numericGitlabId(
+                value,
+                "jobId",
+                List.of(
+                        Pattern.compile("/-/jobs/(\\d+)"),
+                        Pattern.compile("/jobs/(\\d+)"),
+                        Pattern.compile("(?i)^job\\s+#?(\\d+)$")));
     }
 
-    public String mergeRequestState(String state) {
+    public String mergeRequestState(String state) { // NOPMD - existing complexity baseline
         if (!StringUtils.hasText(state)) {
             return "opened";
         }
-        String normalized = state.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
+        String normalized =
+                state.trim().toLowerCase(Locale.ROOT).replace('-', '_').replace(' ', '_');
         return switch (normalized) {
             case "open", "opened" -> "opened";
             case "close", "closed" -> "closed";
             case "lock", "locked" -> "locked";
             case "merge", "merged" -> "merged";
             case "all", "any", "*" -> "all";
-            default -> throw new IllegalArgumentException("Unsupported merge request state: " + state
-                    + ". Supported values: opened, closed, locked, merged, all.");
+            default ->
+                throw new IllegalArgumentException("Unsupported merge request state: " + state
+                        + ". Supported values: opened, closed, locked, merged, all.");
         };
     }
 
@@ -513,7 +514,8 @@ public class GitlabApiClient {
             return text;
         }
         return TAIL_TRUNCATED_PREFIX.formatted(maxBytes)
-                + decodeUtf8Slice(bytes, Math.max(0, bytes.length - maxBytes), maxBytes).stripLeading();
+                + decodeUtf8Slice(bytes, Math.max(0, bytes.length - maxBytes), maxBytes)
+                        .stripLeading();
     }
 
     private String prettyJson(String response) {
@@ -608,10 +610,10 @@ public class GitlabApiClient {
             return;
         }
         if (!allowedProjects.contains(normalizedProjectId)) {
-            throw new IllegalArgumentException("Project is not allowed by GITLAB_ALLOWED_PROJECTS: " + originalProjectId);
+            throw new IllegalArgumentException(
+                    "Project is not allowed by GITLAB_ALLOWED_PROJECTS: " + originalProjectId);
         }
     }
 
-    public record QueryParam(String name, Object value) {
-    }
+    public record QueryParam(String name, Object value) {}
 }

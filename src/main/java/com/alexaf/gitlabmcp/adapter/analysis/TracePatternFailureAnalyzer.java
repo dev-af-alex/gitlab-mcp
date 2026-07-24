@@ -1,5 +1,10 @@
 package com.alexaf.gitlabmcp.adapter.analysis;
 
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Locale;
+import java.util.regex.Pattern;
+
 import com.alexaf.gitlabmcp.domain.Confidence;
 import com.alexaf.gitlabmcp.domain.Evidence;
 import com.alexaf.gitlabmcp.domain.Finding;
@@ -7,11 +12,6 @@ import com.alexaf.gitlabmcp.domain.FindingCategory;
 import com.alexaf.gitlabmcp.domain.PipelineContext;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.port.FailureAnalyzer;
-
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Locale;
-import java.util.regex.Pattern;
 
 public abstract class TracePatternFailureAnalyzer implements FailureAnalyzer {
 
@@ -22,12 +22,7 @@ public abstract class TracePatternFailureAnalyzer implements FailureAnalyzer {
     private final String recommendation;
 
     protected TracePatternFailureAnalyzer(
-            String id,
-            String toolchain,
-            int priority,
-            List<String> patterns,
-            String recommendation
-    ) {
+            String id, String toolchain, int priority, List<String> patterns, String recommendation) {
         this.id = id;
         this.toolchain = toolchain;
         this.priority = priority;

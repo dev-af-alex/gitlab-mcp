@@ -68,11 +68,12 @@ class GitlabDtoTest {
 
         ArtifactFile file = objectMapper.readValue(json, ArtifactFile.class);
 
-        assertThat(file).isEqualTo(new ArtifactFile(
-                "TEST-ServiceTest.xml",
-                "target/surefire-reports/TEST-ServiceTest.xml",
-                "file",
-                987L,
-                "100644"));
+        assertThat(file)
+                .isEqualTo(new ArtifactFile(
+                        "TEST-ServiceTest.xml",
+                        "target/surefire-reports/TEST-ServiceTest.xml",
+                        "file",
+                        987L,
+                        "100644"));
     }
 }

@@ -1,8 +1,5 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
@@ -11,6 +8,9 @@ import java.nio.file.Path;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipOutputStream;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
@@ -47,7 +47,9 @@ class MavenArtifactDiagnosticsTest {
         try (ZipFile zip = syntheticArchive()) {
             int failedReports = 0;
             int failedCases = 0;
-            for (ZipEntry entry : zip.stream().filter(candidate -> candidate.getName().endsWith(".txt")).toList()) {
+            for (ZipEntry entry : zip.stream()
+                    .filter(candidate -> candidate.getName().endsWith(".txt"))
+                    .toList()) {
                 SurefireReportInsight insight = reportAnalyzer.analyze(entry.getName(), read(zip, entry));
                 if (hasFailure(insight)) {
                     failedReports++;
@@ -69,7 +71,8 @@ class MavenArtifactDiagnosticsTest {
 
             assertThat(insight.className()).isEqualTo(TEST_CLASS);
             assertThat(insight.failures()).isEqualTo(2);
-            assertThat(insight.testFailures()).extracting(SurefireTestFailure::methodName)
+            assertThat(insight.testFailures())
+                    .extracting(SurefireTestFailure::methodName)
                     .containsExactly("returnsFirstExample", "returnsSecondExample");
             assertThat(insight.testFailures()).allSatisfy(test -> {
                 assertThat(test.exceptionType()).isEqualTo("org.opentest4j.AssertionFailedError");
@@ -89,7 +92,8 @@ class MavenArtifactDiagnosticsTest {
             assertThat(insight.className()).isEqualTo(TEST_CLASS);
             assertThat(insight.testsRun()).isEqualTo(3);
             assertThat(insight.failures()).isEqualTo(1);
-            assertThat(insight.testFailures()).singleElement()
+            assertThat(insight.testFailures())
+                    .singleElement()
                     .satisfies(failure -> assertThat(failure.methodName()).isEqualTo("returnsFirstExample"));
         }
     }

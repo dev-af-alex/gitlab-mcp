@@ -19,6 +19,4 @@ public record Project(
         String visibility,
         Boolean archived,
         @JsonProperty("last_activity_at") String lastActivityAt,
-        ProjectNamespace namespace
-) {
-}
+        ProjectNamespace namespace) {}

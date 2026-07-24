@@ -1,9 +1,10 @@
 package com.alexaf.gitlabmcp.adapter.analysis.python;
 
-import com.alexaf.gitlabmcp.adapter.analysis.TracePatternFailureAnalyzer;
+import java.util.List;
+
 import org.springframework.stereotype.Component;
 
-import java.util.List;
+import com.alexaf.gitlabmcp.adapter.analysis.TracePatternFailureAnalyzer;
 
 @Component
 public class PytestTraceFailureAnalyzer extends TracePatternFailureAnalyzer {
@@ -13,11 +14,7 @@ public class PytestTraceFailureAnalyzer extends TracePatternFailureAnalyzer {
                 "pytest-trace",
                 "python",
                 170,
-                List.of(
-                        "^FAILED\\s+\\S+::",
-                        "^ERROR\\s+\\S+::",
-                        "AssertionError",
-                        "short test summary info"),
+                List.of("^FAILED\\s+\\S+::", "^ERROR\\s+\\S+::", "AssertionError", "short test summary info"),
                 "Inspect the failing pytest node and its assertion or fixture setup.");
     }
 }

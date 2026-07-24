@@ -10,7 +10,8 @@ const sharedBuildPaths = [
 const javaBuildPaths = [
     ...sharedBuildPaths,
     /^\.mvn\//,
-    /^mvnw(?:\.cmd)?$/
+    /^mvnw(?:\.cmd)?$/,
+    /^pmd\.ruleset\.xml$/
 ];
 const dockerBuildPaths = [
     ...sharedBuildPaths,

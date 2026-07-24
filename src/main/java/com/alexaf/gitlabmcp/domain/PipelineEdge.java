@@ -6,6 +6,4 @@ public record PipelineEdge(
         String targetProjectId,
         Long targetPipelineId,
         Long bridgeJobId,
-        String bridgeJobName
-) {
-}
+        String bridgeJobName) {}

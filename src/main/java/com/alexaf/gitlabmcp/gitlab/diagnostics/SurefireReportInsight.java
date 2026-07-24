@@ -15,11 +15,12 @@ public record SurefireReportInsight(
         String rootCauseMessage,
         boolean infrastructure,
         List<String> evidence,
-        List<SurefireTestFailure> testFailures
-) {
+        List<SurefireTestFailure> testFailures) {
 
     private static String compactLine(String value) {
-        String normalized = value.replaceAll("\\u001B\\[[;\\d]*m", "").replaceAll("\\s+", " ").strip();
+        String normalized = value.replaceAll("\\u001B\\[[;\\d]*m", "")
+                .replaceAll("\\s+", " ")
+                .strip();
         return normalized.length() > 500 ? normalized.substring(0, 500) + "..." : normalized;
     }
 
@@ -46,7 +47,11 @@ public record SurefireReportInsight(
                 rootCauseType,
                 rootCauseMessage,
                 infrastructure,
-                compactEvidence.stream().map(SurefireReportInsight::compactLine).distinct().limit(3).toList(),
+                compactEvidence.stream()
+                        .map(SurefireReportInsight::compactLine)
+                        .distinct()
+                        .limit(3)
+                        .toList(),
                 testFailures);
     }
 }

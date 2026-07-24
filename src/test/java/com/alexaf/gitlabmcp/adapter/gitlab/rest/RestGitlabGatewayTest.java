@@ -1,26 +1,28 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
-import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
-import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
-import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-import org.springframework.http.MediaType;
-import org.springframework.http.HttpStatus;
-import org.springframework.test.web.client.MockRestServiceServer;
-import org.springframework.web.client.RestClient;
-
 import java.io.ByteArrayOutputStream;
 import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.test.web.client.MockRestServiceServer;
+import org.springframework.web.client.RestClient;
+
+import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
+import com.alexaf.gitlabmcp.gitlab.client.GitlabApiClient;
+import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
+
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.test.web.client.ExpectedCount.once;
 import static org.springframework.test.web.client.match.MockRestRequestMatchers.requestTo;
-import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 import static org.springframework.test.web.client.response.MockRestResponseCreators.withStatus;
+import static org.springframework.test.web.client.response.MockRestResponseCreators.withSuccess;
 
 class RestGitlabGatewayTest {
 
@@ -41,8 +43,9 @@ class RestGitlabGatewayTest {
     @Test
     void readsMergeRequestChangesThroughGitlab15CompatibleEndpoint() {
         expectVersion("15.1.0-ee");
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/changes"))
+        server.expect(
+                        once(),
+                        requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/changes"))
                 .andRespond(withSuccess("""
                         {
                           "id": 101,
@@ -56,7 +59,8 @@ class RestGitlabGatewayTest {
         var changes = gateway.getMergeRequestChanges("group/repo", "!17");
 
         assertThat(changes.iid()).isEqualTo(17);
-        assertThat(changes.changes()).singleElement()
+        assertThat(changes.changes())
+                .singleElement()
                 .satisfies(change -> assertThat(change.newPath()).isEqualTo("b.txt"));
         server.verify();
     }
@@ -64,14 +68,14 @@ class RestGitlabGatewayTest {
     @Test
     void usesPaginatedDiffEndpointOnGitlab15_7AndNewer() {
         expectVersion("15.7.0-ee");
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
+        server.expect(
+                        once(),
+                        requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
                                 + "?page=1&per_page=100"))
                 .andRespond(withSuccess("""
                         [{"old_path": "a.txt", "new_path": "b.txt", "diff": "@@"}]
                         """, MediaType.APPLICATION_JSON));
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17"))
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17"))
                 .andRespond(withSuccess("""
                         {
                           "id": 101,
@@ -87,7 +91,8 @@ class RestGitlabGatewayTest {
         var changes = gateway.getMergeRequestChanges("group/repo", "!17");
 
         assertThat(changes.title()).isEqualTo("Change");
-        assertThat(changes.changes()).singleElement()
+        assertThat(changes.changes())
+                .singleElement()
                 .satisfies(change -> assertThat(change.newPath()).isEqualTo("b.txt"));
         server.verify();
     }
@@ -95,12 +100,14 @@ class RestGitlabGatewayTest {
     @Test
     void fallsBackToLegacyChangesWhenDiffEndpointIsUnavailable() {
         expectVersion("18.8.0-ee");
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
+        server.expect(
+                        once(),
+                        requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
                                 + "?page=1&per_page=100"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/changes"))
+        server.expect(
+                        once(),
+                        requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/changes"))
                 .andRespond(withSuccess("""
                         {"id": 101, "iid": 17, "changes": []}
                         """, MediaType.APPLICATION_JSON));
@@ -113,8 +120,9 @@ class RestGitlabGatewayTest {
 
     @Test
     void listsPipelineJobsWithNormalizedIdsAndPagination() {
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/jobs"
+        server.expect(
+                        once(),
+                        requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/jobs"
                                 + "?include_retried=false&page=2&per_page=30"))
                 .andRespond(withSuccess("""
                         [{
@@ -131,26 +139,22 @@ class RestGitlabGatewayTest {
                         }]
                         """, MediaType.APPLICATION_JSON));
 
-        var jobs = gateway.listPipelineJobs(
-                "group/repo",
-                "pipeline #42",
-                false,
-                new GitlabPageRequest(2, 30));
+        var jobs = gateway.listPipelineJobs("group/repo", "pipeline #42", false, new GitlabPageRequest(2, 30));
 
-        assertThat(jobs).singleElement()
-                .satisfies(job -> {
-                    assertThat(job.id()).isEqualTo(7);
-                    assertThat(job.name()).isEqualTo("test");
-                    assertThat(job.runner().description()).isEqualTo("linux arm64");
-                    assertThat(job.runner().runnerType()).isEqualTo("project_type");
-                });
+        assertThat(jobs).singleElement().satisfies(job -> {
+            assertThat(job.id()).isEqualTo(7);
+            assertThat(job.name()).isEqualTo("test");
+            assertThat(job.runner().description()).isEqualTo("linux arm64");
+            assertThat(job.runner().runnerType()).isEqualTo("project_type");
+        });
         server.verify();
     }
 
     @Test
     void listsDownstreamPipelinesThroughBridgesOnGitlab15_1() {
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/bridges"
+        server.expect(
+                        once(),
+                        requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/bridges"
                                 + "?page=1&per_page=100"))
                 .andRespond(withSuccess("""
                         [{
@@ -168,20 +172,18 @@ class RestGitlabGatewayTest {
 
         var bridges = gateway.getPipelineBridges("group/repo", "42", 20);
 
-        assertThat(bridges.items()).singleElement()
-                .satisfies(bridge -> {
-                    assertThat(bridge.id()).isEqualTo(700);
-                    assertThat(bridge.downstreamPipeline().id()).isEqualTo(84);
-                    assertThat(bridge.downstreamPipeline().projectId()).isEqualTo(12);
-                });
+        assertThat(bridges.items()).singleElement().satisfies(bridge -> {
+            assertThat(bridge.id()).isEqualTo(700);
+            assertThat(bridge.downstreamPipeline().id()).isEqualTo(84);
+            assertThat(bridge.downstreamPipeline().projectId()).isEqualTo(12);
+        });
         assertThat(bridges.truncated()).isFalse();
         server.verify();
     }
 
     @Test
     void readsLanguageIndependentTestReportOnGitlab15_1() {
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/test_report"))
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/pipelines/42/test_report"))
                 .andRespond(withSuccess("""
                         {
                           "total_count": 2,
@@ -202,34 +204,27 @@ class RestGitlabGatewayTest {
 
         var report = gateway.getPipelineTestReport("group/repo", "42");
 
-        assertThat(report).isPresent().get()
-                .satisfies(value -> {
-                    assertThat(value.totalCount()).isEqualTo(2);
-                    assertThat(value.testSuites()).singleElement()
-                            .satisfies(suite -> assertThat(suite.testCases()).singleElement()
-                                    .satisfies(test -> assertThat(test.name())
-                                            .isEqualTo("test_checkout")));
-                });
+        assertThat(report).isPresent().get().satisfies(value -> {
+            assertThat(value.totalCount()).isEqualTo(2);
+            assertThat(value.testSuites())
+                    .singleElement()
+                    .satisfies(suite -> assertThat(suite.testCases())
+                            .singleElement()
+                            .satisfies(test -> assertThat(test.name()).isEqualTo("test_checkout")));
+        });
         server.verify();
     }
 
     @Test
     void listsArtifactsFromZipOnGitlab15_1() throws Exception {
         expectVersion("15.1.0-ee");
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/jobs/7/artifacts"))
-                .andRespond(withSuccess(
-                        zip("target/report.xml"),
-                        MediaType.APPLICATION_OCTET_STREAM));
+        server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/jobs/7/artifacts"))
+                .andRespond(withSuccess(zip("target/report.xml"), MediaType.APPLICATION_OCTET_STREAM));
 
-        var artifacts = gateway.listJobArtifacts(
-                "group/repo",
-                "7",
-                null,
-                true,
-                new GitlabPageRequest(1, 20));
+        var artifacts = gateway.listJobArtifacts("group/repo", "7", null, true, new GitlabPageRequest(1, 20));
 
-        assertThat(artifacts).singleElement()
+        assertThat(artifacts)
+                .singleElement()
                 .satisfies(artifact -> assertThat(artifact.path()).isEqualTo("target/report.xml"));
         server.verify();
     }
@@ -237,8 +232,9 @@ class RestGitlabGatewayTest {
     @Test
     void listsArtifactsFromMetadataOnGitlab18_8() {
         expectVersion("18.8.0-ee");
-        server.expect(once(), requestTo(
-                        "https://gitlab.example/api/v4/projects/group%2Frepo/jobs/7/artifacts/tree"
+        server.expect(
+                        once(),
+                        requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/jobs/7/artifacts/tree"
                                 + "?recursive=true&page=1&per_page=20"))
                 .andRespond(withSuccess("""
                         [{
@@ -250,18 +246,12 @@ class RestGitlabGatewayTest {
                         }]
                         """, MediaType.APPLICATION_JSON));
 
-        var artifacts = gateway.listJobArtifacts(
-                "group/repo",
-                "7",
-                null,
-                true,
-                new GitlabPageRequest(1, 20));
+        var artifacts = gateway.listJobArtifacts("group/repo", "7", null, true, new GitlabPageRequest(1, 20));
 
-        assertThat(artifacts).singleElement()
-                .satisfies(artifact -> {
-                    assertThat(artifact.path()).isEqualTo("target/report.xml");
-                    assertThat(artifact.size()).isEqualTo(42);
-                });
+        assertThat(artifacts).singleElement().satisfies(artifact -> {
+            assertThat(artifact.path()).isEqualTo("target/report.xml");
+            assertThat(artifact.size()).isEqualTo(42);
+        });
         server.verify();
     }
 

@@ -10,6 +10,4 @@ public record UserSummary(
         String name,
         String state,
         @JsonProperty("web_url") String webUrl,
-        @JsonProperty("avatar_url") String avatarUrl
-) {
-}
+        @JsonProperty("avatar_url") String avatarUrl) {}

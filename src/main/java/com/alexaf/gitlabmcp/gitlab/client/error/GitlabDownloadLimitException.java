@@ -7,8 +7,10 @@ public final class GitlabDownloadLimitException extends GitlabApiException {
     private final long maxBytes;
 
     public GitlabDownloadLimitException(URI requestUri, long maxBytes) {
-        super("GitLab response exceeds configured download limit of " + maxBytes
-                + " bytes: " + requestUri, requestUri, null);
+        super(
+                "GitLab response exceeds configured download limit of " + maxBytes + " bytes: " + requestUri,
+                requestUri,
+                null);
         this.maxBytes = maxBytes;
     }
 

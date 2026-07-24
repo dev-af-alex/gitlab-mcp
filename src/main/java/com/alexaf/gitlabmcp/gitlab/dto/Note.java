@@ -14,6 +14,4 @@ public record Note(
         Boolean system,
         Boolean resolvable,
         Boolean resolved,
-        @JsonProperty("resolved_by") UserSummary resolvedBy
-) {
-}
+        @JsonProperty("resolved_by") UserSummary resolvedBy) {}

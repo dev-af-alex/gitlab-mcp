@@ -1,8 +1,8 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
-import com.alexaf.gitlabmcp.gitlab.dto.RunnerInfo;
-
 import java.util.List;
+
+import com.alexaf.gitlabmcp.gitlab.dto.RunnerInfo;
 
 public record JobDiagnostic(
         Long id,
@@ -19,6 +19,4 @@ public record JobDiagnostic(
         String trace,
         boolean traceTruncated,
         List<String> nextSteps,
-        RunnerInfo runner
-) {
-}
+        RunnerInfo runner) {}

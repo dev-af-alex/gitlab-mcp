@@ -1,21 +1,21 @@
 package com.alexaf.gitlabmcp.gitlab.diagnostics;
 
-import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
-import com.alexaf.gitlabmcp.gitlab.dto.Job;
-import com.alexaf.gitlabmcp.gitlab.dto.JobArtifact;
-import org.springframework.stereotype.Component;
-import org.springframework.util.StringUtils;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
 
+import org.springframework.stereotype.Component;
+import org.springframework.util.StringUtils;
+
+import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
+import com.alexaf.gitlabmcp.gitlab.dto.Job;
+import com.alexaf.gitlabmcp.gitlab.dto.JobArtifact;
+
 @Component
 public class ArtifactHintDetector {
 
-    private static final List<String> INTERESTING_ARTIFACT_MARKERS = List.of(
-            "junit", "surefire", "failsafe", "test-results", "pytest", "allure", "eslint", "coverage"
-    );
+    private static final List<String> INTERESTING_ARTIFACT_MARKERS =
+            List.of("junit", "surefire", "failsafe", "test-results", "pytest", "allure", "eslint", "coverage");
 
     public List<String> usefulArtifacts(Job job, List<ArtifactFile> artifactFiles) {
         List<String> result = new ArrayList<>();
@@ -33,10 +33,12 @@ public class ArtifactHintDetector {
     }
 
     private String artifactDescription(JobArtifact artifact) {
-        return String.join(" ",
-                nullToEmpty(artifact.fileType()),
-                nullToEmpty(artifact.filename()),
-                nullToEmpty(artifact.fileFormat())).strip();
+        return String.join(
+                        " ",
+                        nullToEmpty(artifact.fileType()),
+                        nullToEmpty(artifact.filename()),
+                        nullToEmpty(artifact.fileFormat()))
+                .strip();
     }
 
     private boolean interestingArtifact(String value) {

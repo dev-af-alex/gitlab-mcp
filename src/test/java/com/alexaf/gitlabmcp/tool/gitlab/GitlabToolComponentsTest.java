@@ -1,11 +1,16 @@
 package com.alexaf.gitlabmcp.tool.gitlab;
 
+import java.util.List;
+
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+
 import com.alexaf.gitlabmcp.application.JsonResponseWriter;
 import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
-import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
 import com.alexaf.gitlabmcp.domain.GitlabVersion;
+import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.ArtifactHintDetector;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.LogMatcher;
 import com.alexaf.gitlabmcp.gitlab.diagnostics.MavenFailureAnalyzer;
@@ -24,10 +29,6 @@ import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
 import com.alexaf.gitlabmcp.port.PipelineContextCollector;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
-
-import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
@@ -47,24 +48,65 @@ class GitlabToolComponentsTest {
     private GitlabDiagnosticsTools diagnosticsTools;
 
     private static Project project(Long id, String name) {
-        return new Project(id, null, name, null, null, "group/" + name, "main",
-                null, null, null, null, "private", false, null, null);
+        return new Project(
+                id,
+                null,
+                name,
+                null,
+                null,
+                "group/" + name,
+                "main",
+                null,
+                null,
+                null,
+                null,
+                "private",
+                false,
+                null,
+                null);
     }
 
     private static Pipeline pipeline(Long id) {
-        return new Pipeline(id, 1L, 11L, "abc123", "main", "failed", "push",
-                null, null, null, null, 60L, 1L, "https://gitlab.example/pipelines/" + id);
+        return new Pipeline(
+                id,
+                1L,
+                11L,
+                "abc123",
+                "main",
+                "failed",
+                "push",
+                null,
+                null,
+                null,
+                null,
+                60L,
+                1L,
+                "https://gitlab.example/pipelines/" + id);
     }
 
     private static Job job(Long id, String name) {
-        return new Job(id, name, "test", "failed", "script_failure", null, "main",
-                false, false, null, null, null, 60.0, 1.0, List.of());
+        return new Job(
+                id,
+                name,
+                "test",
+                "failed",
+                "script_failure",
+                null,
+                "main",
+                false,
+                false,
+                null,
+                null,
+                null,
+                60.0,
+                1.0,
+                List.of());
     }
 
     private static MergeRequest mergeRequest(Long iid) {
-        return new MergeRequest(1L, iid, 11L, "MR", null, "opened", null, null,
-                "main", "feature", null, List.of(), List.of(), List.of(), false, false,
-                0, null, null, null, null, null, null, false, true, null, null, null);
+        return new MergeRequest(
+                1L, iid, 11L, "MR", null, "opened", null, null, "main", "feature", null, List.of(), List.of(),
+                List.of(), false, false, 0, null, null, null, null, null, null, false, true, null, null, null);
     }
 
     @BeforeEach
@@ -95,11 +137,7 @@ class GitlabToolComponentsTest {
     @Test
     void getServerInfoDelegatesToGatewayAndSerializesResponse() {
         GitlabServerInfo info = new GitlabServerInfo(
-                GitlabVersion.parse("15.1.0-ee"),
-                "abc123",
-                java.util.Set.of(),
-                GitlabVersion.of(15, 1, 0),
-                true);
+                GitlabVersion.parse("15.1.0-ee"), "abc123", java.util.Set.of(), GitlabVersion.of(15, 1, 0), true);
         when(gateway.getServerInfo()).thenReturn(info);
 
         String response = projectTools.getServerInfo();
@@ -136,9 +174,8 @@ class GitlabToolComponentsTest {
     @Test
     void listMergeRequestsMapsFiltersSortingAndPagination() {
         List<MergeRequest> mergeRequests = List.of();
-        MergeRequestQuery query = new MergeRequestQuery(
-                "open", "bug", "feature", "main", "alice", "bob",
-                new GitlabPageRequest(3, 25));
+        MergeRequestQuery query =
+                new MergeRequestQuery("open", "bug", "feature", "main", "alice", "bob", new GitlabPageRequest(3, 25));
         when(gateway.listMergeRequests("group/repo", query)).thenReturn(mergeRequests);
 
         String response = mergeRequestTools.listMergeRequests(
@@ -163,8 +200,8 @@ class GitlabToolComponentsTest {
 
     @Test
     void getMergeRequestChangesMapsProjectAndIidToChangesEndpoint() {
-        MergeRequestChanges changes = new MergeRequestChanges(1L, 42L, 11L, "MR", null, "opened",
-                "main", "feature", null, null, List.of());
+        MergeRequestChanges changes =
+                new MergeRequestChanges(1L, 42L, 11L, "MR", null, "opened", "main", "feature", null, null, List.of());
         when(gateway.getMergeRequestChanges("group/repo", "!42")).thenReturn(changes);
 
         String response = mergeRequestTools.getMergeRequestChanges("group/repo", "!42");
@@ -177,42 +214,39 @@ class GitlabToolComponentsTest {
     @Test
     void getMergeRequestCommitsMapsProjectIidAndPagination() {
         List<Commit> commits = List.of();
-        when(gateway.listMergeRequestCommits(
-                "group/repo", "!42", new GitlabPageRequest(4, 30))).thenReturn(commits);
+        when(gateway.listMergeRequestCommits("group/repo", "!42", new GitlabPageRequest(4, 30)))
+                .thenReturn(commits);
 
         String response = mergeRequestTools.getMergeRequestCommits("group/repo", "!42", 4, 30);
 
         assertThat(response).isEqualTo("json");
-        verify(gateway).listMergeRequestCommits(
-                "group/repo", "!42", new GitlabPageRequest(4, 30));
+        verify(gateway).listMergeRequestCommits("group/repo", "!42", new GitlabPageRequest(4, 30));
         verify(responseWriter).write(commits);
     }
 
     @Test
     void getMergeRequestDiscussionsMapsProjectIidAndPagination() {
         List<Discussion> discussions = List.of();
-        when(gateway.listMergeRequestDiscussions(
-                "group/repo", "!42", new GitlabPageRequest(5, 40))).thenReturn(discussions);
+        when(gateway.listMergeRequestDiscussions("group/repo", "!42", new GitlabPageRequest(5, 40)))
+                .thenReturn(discussions);
 
         String response = mergeRequestTools.getMergeRequestDiscussions("group/repo", "!42", 5, 40);
 
         assertThat(response).isEqualTo("json");
-        verify(gateway).listMergeRequestDiscussions(
-                "group/repo", "!42", new GitlabPageRequest(5, 40));
+        verify(gateway).listMergeRequestDiscussions("group/repo", "!42", new GitlabPageRequest(5, 40));
         verify(responseWriter).write(discussions);
     }
 
     @Test
     void getMergeRequestPipelinesMapsProjectIidAndPagination() {
         List<Pipeline> pipelines = List.of();
-        when(gateway.listMergeRequestPipelines(
-                "group/repo", "!42", new GitlabPageRequest(6, 60))).thenReturn(pipelines);
+        when(gateway.listMergeRequestPipelines("group/repo", "!42", new GitlabPageRequest(6, 60)))
+                .thenReturn(pipelines);
 
         String response = mergeRequestTools.getMergeRequestPipelines("group/repo", "!42", 6, 60);
 
         assertThat(response).isEqualTo("json");
-        verify(gateway).listMergeRequestPipelines(
-                "group/repo", "!42", new GitlabPageRequest(6, 60));
+        verify(gateway).listMergeRequestPipelines("group/repo", "!42", new GitlabPageRequest(6, 60));
         verify(responseWriter).write(pipelines);
     }
 
@@ -231,14 +265,13 @@ class GitlabToolComponentsTest {
     @Test
     void listPipelineJobsMapsProjectPipelineAndPagination() {
         List<Job> jobs = List.of(job(8L, "test"));
-        when(gateway.listPipelineJobs(
-                "group/repo", "pipeline-url", true, new GitlabPageRequest(2, 30))).thenReturn(jobs);
+        when(gateway.listPipelineJobs("group/repo", "pipeline-url", true, new GitlabPageRequest(2, 30)))
+                .thenReturn(jobs);
 
         String response = pipelineTools.listPipelineJobs("group/repo", "pipeline-url", true, 2, 30);
 
         assertThat(response).isEqualTo("json");
-        verify(gateway).listPipelineJobs(
-                "group/repo", "pipeline-url", true, new GitlabPageRequest(2, 30));
+        verify(gateway).listPipelineJobs("group/repo", "pipeline-url", true, new GitlabPageRequest(2, 30));
         verify(responseWriter).write(jobs);
     }
 
@@ -264,16 +297,15 @@ class GitlabToolComponentsTest {
 
     @Test
     void listJobArtifactsReadsArchiveAndAppliesFiltersAndPagination() {
-        List<ArtifactFile> artifacts = List.of(new ArtifactFile("junit.xml", "target/junit.xml", "file", 42L, "100644"));
-        when(gateway.listJobArtifacts(
-                "group/repo", "job-url", "target", true, new GitlabPageRequest(3, 40)))
+        List<ArtifactFile> artifacts =
+                List.of(new ArtifactFile("junit.xml", "target/junit.xml", "file", 42L, "100644"));
+        when(gateway.listJobArtifacts("group/repo", "job-url", "target", true, new GitlabPageRequest(3, 40)))
                 .thenReturn(artifacts);
 
         String response = jobTools.listJobArtifacts("group/repo", "job-url", "target", true, 3, 40);
 
         assertThat(response).isEqualTo("json");
-        verify(gateway).listJobArtifacts(
-                "group/repo", "job-url", "target", true, new GitlabPageRequest(3, 40));
+        verify(gateway).listJobArtifacts("group/repo", "job-url", "target", true, new GitlabPageRequest(3, 40));
         verify(responseWriter).write(artifacts);
     }
 
@@ -281,48 +313,41 @@ class GitlabToolComponentsTest {
     void findJobArtifactFilesReadsArchiveAndAppliesPattern() {
         List<ArtifactFile> artifacts = List.of(new ArtifactFile("TEST.xml", "target/TEST.xml", "file", 42L, null));
         when(gateway.findJobArtifactFiles(
-                "group/repo", "job-url", "**/TEST-*.xml", false, new GitlabPageRequest(1, 20)))
+                        "group/repo", "job-url", "**/TEST-*.xml", false, new GitlabPageRequest(1, 20)))
                 .thenReturn(artifacts);
 
         String response = jobTools.findJobArtifactFiles("group/repo", "job-url", "**/TEST-*.xml", false, 1, 20);
 
         assertThat(response).isEqualTo("json");
-        verify(gateway).findJobArtifactFiles(
-                "group/repo", "job-url", "**/TEST-*.xml", false, new GitlabPageRequest(1, 20));
+        verify(gateway)
+                .findJobArtifactFiles("group/repo", "job-url", "**/TEST-*.xml", false, new GitlabPageRequest(1, 20));
         verify(responseWriter).write(artifacts);
     }
 
     @Test
     void getJobArtifactFileMapsProjectJobArtifactPathAndLimit() {
-        when(gateway.getJobArtifactFile(
-                "group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048))
+        when(gateway.getJobArtifactFile("group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048))
                 .thenReturn("artifact");
 
-        String response = jobTools.getJobArtifactFile("group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048);
+        String response =
+                jobTools.getJobArtifactFile("group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048);
 
         assertThat(response).isEqualTo("artifact");
-        verify(gateway).getJobArtifactFile(
-                "group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048);
+        verify(gateway).getJobArtifactFile("group/repo", "job-url", "/target/surefire-reports/TEST.xml", 2048);
     }
 
     @Test
     void analyzeFailedPipelineDelegatesToDiagnosticsServiceAndSerializesResult() {
         PipelineDiagnosticsResult result = new PipelineDiagnosticsResult(
-                pipeline(123L),
-                "summary",
-                List.of(),
-                List.of(),
-                true,
-                false,
-                false,
-                null);
+                pipeline(123L), "summary", List.of(), List.of(), true, false, false, null);
         diagnosticsService.result = result;
 
-        String response = diagnosticsTools.analyzeFailedPipeline("group/repo", "pipeline-url", null, true, 4096, false, false, false);
+        String response = diagnosticsTools.analyzeFailedPipeline(
+                "group/repo", "pipeline-url", null, true, 4096, false, false, false);
 
         assertThat(response).isEqualTo("json");
-        assertThat(diagnosticsService.lastCall).isEqualTo(new DiagnosticCall(
-                "group/repo", "pipeline-url", null, true, 4096, false, false, false));
+        assertThat(diagnosticsService.lastCall)
+                .isEqualTo(new DiagnosticCall("group/repo", "pipeline-url", null, true, 4096, false, false, false));
         verify(responseWriter).write(result);
     }
 
@@ -334,9 +359,7 @@ class GitlabToolComponentsTest {
             Integer maxTraceBytesPerJob,
             Boolean includeRawTraces,
             Boolean includeArtifactHints,
-            Boolean includeDetails
-    ) {
-    }
+            Boolean includeDetails) {}
 
     private static final class RecordingPipelineDiagnosticsService extends PipelineDiagnosticsService {
 
@@ -356,16 +379,35 @@ class GitlabToolComponentsTest {
         }
 
         @Override
-        public PipelineDiagnosticsResult analyze(String projectId, String pipelineId, String mergeRequestIid,
-                                                 Boolean includeTraces, Integer maxTraceBytesPerJob, Boolean includeRawTraces, Boolean includeArtifactHints) {
-            return analyze(projectId, pipelineId, mergeRequestIid, includeTraces, maxTraceBytesPerJob,
-                    includeRawTraces, includeArtifactHints, false);
+        public PipelineDiagnosticsResult analyze(
+                String projectId,
+                String pipelineId,
+                String mergeRequestIid,
+                Boolean includeTraces,
+                Integer maxTraceBytesPerJob,
+                Boolean includeRawTraces,
+                Boolean includeArtifactHints) {
+            return analyze(
+                    projectId,
+                    pipelineId,
+                    mergeRequestIid,
+                    includeTraces,
+                    maxTraceBytesPerJob,
+                    includeRawTraces,
+                    includeArtifactHints,
+                    false);
         }
 
         @Override
-        public PipelineDiagnosticsResult analyze(String projectId, String pipelineId, String mergeRequestIid,
-                                                 Boolean includeTraces, Integer maxTraceBytesPerJob, Boolean includeRawTraces,
-                                                 Boolean includeArtifactHints, Boolean includeDetails) {
+        public PipelineDiagnosticsResult analyze(
+                String projectId,
+                String pipelineId,
+                String mergeRequestIid,
+                Boolean includeTraces,
+                Integer maxTraceBytesPerJob,
+                Boolean includeRawTraces,
+                Boolean includeArtifactHints,
+                Boolean includeDetails) {
             lastCall = new DiagnosticCall(
                     projectId,
                     pipelineId,
@@ -378,5 +420,4 @@ class GitlabToolComponentsTest {
             return result;
         }
     }
-
 }

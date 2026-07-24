@@ -19,6 +19,7 @@ test("runs both builds for application changes", () => {
 
 test("runs only the affected build for build-tool changes", () => {
     assert.deepEqual(detectBuildChanges(["mvnw"]), {java: true, docker: false});
+    assert.deepEqual(detectBuildChanges(["pmd.ruleset.xml"]), {java: true, docker: false});
     assert.deepEqual(detectBuildChanges(["Dockerfile"]), {java: false, docker: true});
 });
 

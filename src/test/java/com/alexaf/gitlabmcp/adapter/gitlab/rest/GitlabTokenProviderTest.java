@@ -1,13 +1,14 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
-import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.io.TempDir;
-
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.Duration;
 import java.util.List;
+
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.io.TempDir;
+
+import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

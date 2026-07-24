@@ -1,11 +1,12 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
+import java.util.EnumSet;
+
+import org.springframework.stereotype.Component;
+
 import com.alexaf.gitlabmcp.domain.GitlabCapability;
 import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
 import com.alexaf.gitlabmcp.domain.GitlabVersion;
-import org.springframework.stereotype.Component;
-
-import java.util.EnumSet;
 
 @Component
 public class GitlabCapabilityResolver {

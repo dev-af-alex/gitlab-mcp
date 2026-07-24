@@ -1,9 +1,9 @@
 package com.alexaf.gitlabmcp.gitlab.dto;
 
+import java.util.List;
+
 import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonProperty;
-
-import java.util.List;
 
 @JsonIgnoreProperties(ignoreUnknown = true)
 public record Job(
@@ -22,8 +22,7 @@ public record Job(
         Double duration,
         @JsonProperty("queued_duration") Double queuedDuration,
         List<JobArtifact> artifacts,
-        RunnerInfo runner
-) {
+        RunnerInfo runner) {
 
     public Job(
             Long id,
@@ -40,9 +39,23 @@ public record Job(
             String finishedAt,
             Double duration,
             Double queuedDuration,
-            List<JobArtifact> artifacts
-    ) {
-        this(id, name, stage, status, failureReason, webUrl, ref, tag, allowFailure,
-                createdAt, startedAt, finishedAt, duration, queuedDuration, artifacts, null);
+            List<JobArtifact> artifacts) {
+        this(
+                id,
+                name,
+                stage,
+                status,
+                failureReason,
+                webUrl,
+                ref,
+                tag,
+                allowFailure,
+                createdAt,
+                startedAt,
+                finishedAt,
+                duration,
+                queuedDuration,
+                artifacts,
+                null);
     }
 }

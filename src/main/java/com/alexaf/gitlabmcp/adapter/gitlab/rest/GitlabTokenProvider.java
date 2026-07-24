@@ -1,11 +1,12 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
-import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
+import java.nio.file.Files;
+import java.nio.file.Path;
+
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 
-import java.nio.file.Files;
-import java.nio.file.Path;
+import com.alexaf.gitlabmcp.gitlab.client.GitlabProperties;
 
 @Component
 public class GitlabTokenProvider {
@@ -22,13 +23,13 @@ public class GitlabTokenProvider {
         }
         if (StringUtils.hasText(properties.tokenFile())) {
             try {
-                String token = Files.readString(Path.of(properties.tokenFile().trim())).trim();
+                String token =
+                        Files.readString(Path.of(properties.tokenFile().trim())).trim();
                 if (StringUtils.hasText(token)) {
                     return token;
                 }
             } catch (Exception e) {
-                throw new IllegalArgumentException(
-                        "Unable to read GitLab token from GITLAB_TOKEN_FILE", e);
+                throw new IllegalArgumentException("Unable to read GitLab token from GITLAB_TOKEN_FILE", e);
             }
         }
         throw new IllegalArgumentException("GITLAB_TOKEN or GITLAB_TOKEN_FILE must be set");
