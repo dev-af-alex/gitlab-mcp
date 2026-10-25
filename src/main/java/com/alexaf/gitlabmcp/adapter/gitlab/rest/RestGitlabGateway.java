@@ -1,10 +1,12 @@
 package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Optional;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
+import org.springframework.web.util.UriUtils;
 
 import com.alexaf.gitlabmcp.domain.GitlabPage;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
@@ -16,10 +18,12 @@ import com.alexaf.gitlabmcp.gitlab.dto.ArtifactFile;
 import com.alexaf.gitlabmcp.gitlab.dto.Commit;
 import com.alexaf.gitlabmcp.gitlab.dto.CurrentUser;
 import com.alexaf.gitlabmcp.gitlab.dto.Discussion;
+import com.alexaf.gitlabmcp.gitlab.dto.FileChange;
 import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
+import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestDiffVersion;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
@@ -124,6 +128,70 @@ public class RestGitlabGateway implements GitlabGateway {
                 Discussion.class,
                 gitlab.param("page", page(page)),
                 gitlab.param("per_page", perPage(page)));
+    }
+
+    @Override
+    public Discussion getMergeRequestDiscussion(String projectId, String mergeRequestIid, String discussionId) {
+        if (discussionId == null || !discussionId.matches("[a-zA-Z0-9_-]+")) {
+            throw new IllegalArgumentException("discussionId must be a GitLab discussion id");
+        }
+        return gitlab.getBoundedObject(
+                mergeRequestApi(projectId, mergeRequestIid) + "/discussions/" + discussionId,
+                Discussion.class,
+                2_000_000);
+    }
+
+    @Override
+    public List<MergeRequestDiffVersion> listMergeRequestDiffVersions(
+            String projectId, String mergeRequestIid, GitlabPageRequest page) {
+        return gitlab.getBoundedList(
+                mergeRequestApi(projectId, mergeRequestIid) + "/versions",
+                MergeRequestDiffVersion.class,
+                2_000_000,
+                gitlab.param("page", page(page)),
+                gitlab.param("per_page", perPage(page)));
+    }
+
+    @Override
+    public MergeRequestDiffVersion getMergeRequestDiffVersion(
+            String projectId, String mergeRequestIid, long versionId) {
+        if (versionId <= 0) {
+            throw new IllegalArgumentException("versionId must be positive");
+        }
+        MergeRequestDiffVersion version = gitlab.getBoundedObject(
+                mergeRequestApi(projectId, mergeRequestIid) + "/versions/" + versionId,
+                MergeRequestDiffVersion.class,
+                2_000_000);
+        List<FileChange> diffs = version.diffs() == null
+                ? List.of()
+                : version.diffs().stream()
+                        .map(file -> new FileChange(
+                                file.oldPath(),
+                                file.newPath(),
+                                file.aMode(),
+                                file.bMode(),
+                                file.newFile(),
+                                file.renamedFile(),
+                                file.deletedFile(),
+                                gitlab.redactSecrets(file.diff())))
+                        .toList();
+        return new MergeRequestDiffVersion(
+                version.id(), version.baseSha(), version.startSha(), version.headSha(), version.state(), diffs);
+    }
+
+    @Override
+    public String getRepositoryFile(String projectId, String filePath, String commitSha) {
+        if (commitSha == null || !commitSha.matches("[0-9a-fA-F]{40}")) {
+            throw new IllegalArgumentException("commitSha must be a full commit SHA");
+        }
+        if (filePath == null || filePath.isBlank()) {
+            throw new IllegalArgumentException("filePath must be set");
+        }
+        String path = UriUtils.encodePathSegment(filePath, StandardCharsets.UTF_8);
+        return gitlab.redactSecrets(gitlab.getCompleteText(
+                projectApi(projectId) + "/repository/files/" + path + "/raw",
+                1_000_000,
+                gitlab.param("ref", commitSha)));
     }
 
     @Override

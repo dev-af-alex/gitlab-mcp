@@ -26,6 +26,7 @@ that provide it with a bounded ZIP fallback on older versions.
 - `gitlab_get_merge_request_changes`
 - `gitlab_get_merge_request_commits`
 - `gitlab_get_merge_request_discussions`
+- `gitlab_get_merge_request_discussion_context`
 - `gitlab_get_merge_request_pipelines`
 - `gitlab_get_pipeline`
 - `gitlab_list_pipeline_jobs`
@@ -45,6 +46,36 @@ All tools are declared read-only and never mutate GitLab state.
 Pipeline diagnosis traverses a bounded graph of bridge/downstream pipelines and analyzes GitLab test reports, generic
 JUnit XML, Maven, Gradle, Jest, pytest, and generic traces. Results include normalized findings, runner information,
 detected build systems, and explicit truncation warnings.
+
+## Discussion code context
+
+`gitlab_get_merge_request_discussions` preserves each diff note's `position`: old/new file paths and line numbers,
+base/start/head commit SHAs, position type, and multiline ranges. Replies without a position remain in their thread.
+
+Use `gitlab_get_merge_request_discussion_context(projectId, mergeRequestIid, discussionId, contextLines)` to read a
+thread together with code. `contextLines` defaults to 5 and accepts 0–20. The response contains `discussion`,
+`anchorNoteId` (the first note with a position), and `context`. Code is returned once per thread as structured lines
+with `oldLine`, `newLine`, `kind` (`added`, `removed`, `context`, or `source`), `text`, and `highlighted`.
+
+The tool matches all three SHAs against historical MR diff versions, including after a push or rebase. If a stored
+diff is incomplete or lacks surrounding lines, it reads the new path at `head_sha` or the old path at `base_sha`.
+Repository fallback returns one side's source lines, not a reconstructed diff. It never substitutes a branch tip
+or infers that an old comment has been fixed. Mixed old/new ranges require a stored diff. A missing commit, inaccessible
+file, invalid position, or binary/non-UTF-8 file yields an explicit reason; the available diff excerpt is retained
+if only additional surrounding context is unavailable. Fork commits that cannot be read in the requested project
+also remain explicitly unavailable; the tool does not silently access another project.
+
+`context.status` is `EXACT`, `PARTIAL`, `UNAVAILABLE`, `NO_POSITION` (general discussions), or `UNSUPPORTED`
+(non-text positions). `EXACT` means the selected lines were found at the pinned revision, not that the discussion
+is current or unresolved. `source` identifies `diff` or `repository`; `versionId` identifies a matched diff version
+when available. `truncated` marks output limits; `reason` explains partial or unavailable results.
+
+Limits per call: 100 inspected versions and at most 100 version-list requests, one diff-detail request and one file
+fallback; 2,000,000 bytes per discussion/version response and 1,000,000 bytes per raw file, additionally bounded by
+`GITLAB_MAX_DOWNLOAD_BYTES`. Version page sizes respect `GITLAB_MAX_PER_PAGE`; existing retry limits apply.
+Code excerpts contain at most 200 lines and 60,000 text characters. Existing credential redaction applies to code.
+The new reads use the GitLab 15.1-compatible Discussions, MR Versions, and Repository Files APIs; existing
+`/diffs` → `/changes` fallback behavior is unchanged.
 
 ## Resources
 
@@ -75,7 +106,7 @@ The server is configured with environment variables:
 | `GITLAB_PROXY_URL`           | no       | empty                | Optional HTTP/HTTPS proxy URL                    |
 | `GITLAB_SSL_BUNDLE`          | no       | empty                | Name of a configured Spring SSL bundle           |
 | `GITLAB_TEMP_DIRECTORY`      | no       | system default       | Temporary directory for bounded artifact ZIPs    |
-| `GITLAB_MAX_DOWNLOAD_BYTES`  | no       | `100000000`          | Maximum bytes downloaded for one archive         |
+| `GITLAB_MAX_DOWNLOAD_BYTES`  | no       | `100000000`          | Maximum bytes per archive or context download |
 | `GITLAB_RETRY_ATTEMPTS`      | no       | `2`                  | Retries for idempotent 429/502/503 responses     |
 | `GITLAB_RETRY_BACKOFF`       | no       | `500ms`              | Retry delay when `Retry-After` is absent          |
 

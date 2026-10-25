@@ -6,6 +6,7 @@ import org.springframework.ai.mcp.annotation.McpToolParam;
 import org.springframework.stereotype.Component;
 
 import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.application.discussion.DiscussionContextService;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.MergeRequestQuery;
 import com.alexaf.gitlabmcp.port.GitlabGateway;
@@ -15,10 +16,15 @@ public class GitlabMergeRequestTools {
 
     private final GitlabGateway gitlab;
     private final JsonResponseWriter responseWriter;
+    private final DiscussionContextService discussionContextService;
 
-    public GitlabMergeRequestTools(GitlabGateway gitlab, JsonResponseWriter responseWriter) {
+    public GitlabMergeRequestTools(
+            GitlabGateway gitlab,
+            JsonResponseWriter responseWriter,
+            DiscussionContextService discussionContextService) {
         this.gitlab = gitlab;
         this.responseWriter = responseWriter;
+        this.discussionContextService = discussionContextService;
     }
 
     @McpTool(
@@ -87,7 +93,8 @@ public class GitlabMergeRequestTools {
 
     @McpTool(
             name = "gitlab_get_merge_request_discussions",
-            description = "Get discussion threads for a merge request. Read-only.",
+            description =
+                    "Get discussion threads with code positions for a merge request. Use gitlab_get_merge_request_discussion_context for code excerpts. Read-only.",
             annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
     public String getMergeRequestDiscussions(
             @McpToolParam(description = "Project id or full path.") String projectId,
@@ -98,6 +105,21 @@ public class GitlabMergeRequestTools {
                     Integer perPage) {
         return responseWriter.write(
                 gitlab.listMergeRequestDiscussions(projectId, mergeRequestIid, new GitlabPageRequest(page, perPage)));
+    }
+
+    @McpTool(
+            name = "gitlab_get_merge_request_discussion_context",
+            description =
+                    "Get a discussion with highlighted code at its pinned diff version, including historical comments. Never substitutes the current branch. Read-only.",
+            annotations = @McpAnnotations(readOnlyHint = true, destructiveHint = false, idempotentHint = true))
+    public String getMergeRequestDiscussionContext(
+            @McpToolParam(description = "Project id or full path.") String projectId,
+            @McpToolParam(description = "Merge request IID, !IID, or GitLab merge request URL.") String mergeRequestIid,
+            @McpToolParam(description = "Discussion id from gitlab_get_merge_request_discussions.") String discussionId,
+            @McpToolParam(description = "Surrounding lines, from 0 to 20. Defaults to 5.", required = false)
+                    Integer contextLines) {
+        return responseWriter.write(
+                discussionContextService.get(projectId, mergeRequestIid, discussionId, contextLines));
     }
 
     @McpTool(

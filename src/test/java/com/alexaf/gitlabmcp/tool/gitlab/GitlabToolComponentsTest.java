@@ -6,6 +6,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import com.alexaf.gitlabmcp.application.JsonResponseWriter;
+import com.alexaf.gitlabmcp.application.discussion.DiscussionContextService;
 import com.alexaf.gitlabmcp.application.pipeline.PipelineAnalysisEngine;
 import com.alexaf.gitlabmcp.domain.GitlabPageRequest;
 import com.alexaf.gitlabmcp.domain.GitlabServerInfo;
@@ -116,7 +117,7 @@ class GitlabToolComponentsTest {
         when(responseWriter.write(any())).thenReturn("json");
         diagnosticsService = new RecordingPipelineDiagnosticsService(gateway);
         projectTools = new GitlabProjectTools(gateway, responseWriter);
-        mergeRequestTools = new GitlabMergeRequestTools(gateway, responseWriter);
+        mergeRequestTools = new GitlabMergeRequestTools(gateway, responseWriter, mock(DiscussionContextService.class));
         pipelineTools = new GitlabPipelineTools(gateway, responseWriter);
         jobTools = new GitlabJobTools(gateway, responseWriter);
         diagnosticsTools = new GitlabDiagnosticsTools(responseWriter, diagnosticsService);

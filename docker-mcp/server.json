@@ -40,7 +40,11 @@
     },
     {
       "name": "gitlab_get_merge_request_discussions",
-      "description": "Get discussion threads and notes for a merge request."
+      "description": "Get discussion threads and notes with code positions for a merge request."
+    },
+    {
+      "name": "gitlab_get_merge_request_discussion_context",
+      "description": "Get a discussion with highlighted code at its pinned historical diff version and explicit context availability."
     },
     {
       "name": "gitlab_get_merge_request_pipelines",
