@@ -15,6 +15,7 @@ import com.alexaf.gitlabmcp.gitlab.dto.GitlabTestReport;
 import com.alexaf.gitlabmcp.gitlab.dto.Job;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequest;
 import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestChanges;
+import com.alexaf.gitlabmcp.gitlab.dto.MergeRequestDiffVersion;
 import com.alexaf.gitlabmcp.gitlab.dto.Pipeline;
 import com.alexaf.gitlabmcp.gitlab.dto.PipelineBridge;
 import com.alexaf.gitlabmcp.gitlab.dto.Project;
@@ -38,6 +39,15 @@ public interface GitlabGateway {
     List<Commit> listMergeRequestCommits(String projectId, String mergeRequestIid, GitlabPageRequest page);
 
     List<Discussion> listMergeRequestDiscussions(String projectId, String mergeRequestIid, GitlabPageRequest page);
+
+    Discussion getMergeRequestDiscussion(String projectId, String mergeRequestIid, String discussionId);
+
+    List<MergeRequestDiffVersion> listMergeRequestDiffVersions(
+            String projectId, String mergeRequestIid, GitlabPageRequest page);
+
+    MergeRequestDiffVersion getMergeRequestDiffVersion(String projectId, String mergeRequestIid, long versionId);
+
+    String getRepositoryFile(String projectId, String filePath, String commitSha);
 
     List<Pipeline> listMergeRequestPipelines(String projectId, String mergeRequestIid, GitlabPageRequest page);
 

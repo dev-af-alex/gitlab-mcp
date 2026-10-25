@@ -314,6 +314,25 @@ public class GitlabApiClient { // NOPMD - existing complexity baseline
         }
     }
 
+    public String getCompleteText(String path, int maxBytes, QueryParam... queryParams) {
+        Path file = transport.download(path, queryParameters(queryParams), maxBytes);
+        try {
+            return Files.readString(file);
+        } catch (java.io.IOException e) {
+            throw new GitlabDecodeException(" as UTF-8 text", e);
+        } finally {
+            deleteTempFile(file);
+        }
+    }
+
+    public <T> T getBoundedObject(String path, Class<T> type, int maxBytes, QueryParam... queryParams) {
+        return readValue(getCompleteText(path, maxBytes, queryParams), type);
+    }
+
+    public <T> List<T> getBoundedList(String path, Class<T> type, int maxBytes, QueryParam... queryParams) {
+        return readList(getCompleteText(path, maxBytes, queryParams), type);
+    }
+
     public String getTailText(String path, Integer maxBytes, QueryParam... queryParams) {
         Path file = downloadToTempFile(path, queryParams);
         try {

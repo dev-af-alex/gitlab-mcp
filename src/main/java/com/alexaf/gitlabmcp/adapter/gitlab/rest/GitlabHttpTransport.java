@@ -83,11 +83,16 @@ public class GitlabHttpTransport {
     }
 
     public Path download(String path, List<GitlabQueryParameter> queryParameters) {
-        URI uri = uri(path, queryParameters);
-        return withRetry(uri, () -> downloadOnce(uri));
+        return download(path, queryParameters, Long.MAX_VALUE);
     }
 
-    private Path downloadOnce(URI uri) {
+    public Path download(String path, List<GitlabQueryParameter> queryParameters, long maxBytes) {
+        URI uri = uri(path, queryParameters);
+        long limit = Math.min(effectiveMaxDownloadBytes(), maxBytes);
+        return withRetry(uri, () -> downloadOnce(uri, limit));
+    }
+
+    private Path downloadOnce(URI uri, long maxBytes) {
         try {
             return restClient
                     .get()
@@ -98,7 +103,6 @@ public class GitlabHttpTransport {
                         if (status.isError()) {
                             throw exception(uri, status, response.getHeaders(), null);
                         }
-                        long maxBytes = effectiveMaxDownloadBytes();
                         if (response.getHeaders().getContentLength() > maxBytes) {
                             throw new GitlabDownloadLimitException(uri, maxBytes);
                         }
