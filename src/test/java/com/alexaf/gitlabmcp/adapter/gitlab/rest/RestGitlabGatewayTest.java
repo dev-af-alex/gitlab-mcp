@@ -2,12 +2,16 @@ package com.alexaf.gitlabmcp.adapter.gitlab.rest;
 
 import java.io.ByteArrayOutputStream;
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -65,15 +69,28 @@ class RestGitlabGatewayTest {
         server.verify();
     }
 
-    @Test
-    void usesPaginatedDiffEndpointOnGitlab15_7AndNewer() {
-        expectVersion("15.7.0-ee");
+    @ParameterizedTest
+    @ValueSource(strings = {"15.7.0-ee", "17.1.8-ee"})
+    void usesTwentyFilePagesAndCollectsAllMergeRequestDiffs(String version) {
+        expectVersion(version);
+        String firstPage = IntStream.range(0, 20)
+                .mapToObj(index -> "{\"new_path\":\"file-" + index + ".txt\",\"diff\":\"@@\"}")
+                .collect(Collectors.joining(",", "[", "]"));
         server.expect(
                         once(),
                         requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
-                                + "?page=1&per_page=100"))
+                                + "?page=1&per_page=20"))
+                .andRespond(withSuccess(firstPage, MediaType.APPLICATION_JSON)
+                        .header(
+                                "Link",
+                                "<https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
+                                        + "?page=2&per_page=20>; rel=\"next\""));
+        server.expect(
+                        once(),
+                        requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
+                                + "?page=2&per_page=20"))
                 .andRespond(withSuccess("""
-                        [{"old_path": "a.txt", "new_path": "b.txt", "diff": "@@"}]
+                        [{"new_path": "file-20.txt", "diff": "@@"}]
                         """, MediaType.APPLICATION_JSON));
         server.expect(once(), requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17"))
                 .andRespond(withSuccess("""
@@ -92,8 +109,10 @@ class RestGitlabGatewayTest {
 
         assertThat(changes.title()).isEqualTo("Change");
         assertThat(changes.changes())
-                .singleElement()
-                .satisfies(change -> assertThat(change.newPath()).isEqualTo("b.txt"));
+                .extracting(change -> change.newPath())
+                .containsExactlyElementsOf(IntStream.range(0, 21)
+                        .mapToObj(index -> "file-" + index + ".txt")
+                        .toList());
         server.verify();
     }
 
@@ -103,7 +122,7 @@ class RestGitlabGatewayTest {
         server.expect(
                         once(),
                         requestTo("https://gitlab.example/api/v4/projects/group%2Frepo/merge_requests/17/diffs"
-                                + "?page=1&per_page=100"))
+                                + "?page=1&per_page=20"))
                 .andRespond(withStatus(HttpStatus.NOT_FOUND));
         server.expect(
                         once(),
