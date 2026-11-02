@@ -34,7 +34,7 @@ public class MergeRequestDiffProvider {
                             FileChange.class,
                             MAX_DIFF_FILES,
                             gitlab.param("page", 1),
-                            gitlab.param("per_page", 100))
+                            gitlab.param("per_page", 20))
                     .items();
             MergeRequest mergeRequest = gitlab.getObject(mergeRequestApi, MergeRequest.class);
             return changes(mergeRequest, diffs);
